@@ -17,3 +17,7 @@ The waveform feature is intentionally split into two layers:
 The widget accepts per-channel peak envelopes and derives per-track and combined max-peak envelopes from them. It can also accept per-track peaks when channel data is unavailable. Peak extraction must not advance or seek the editor's live audio stream. The indexer will therefore use an independent decoder / stream instance or an equivalent isolated editor-side path before real peak data is connected.
 
 This separation keeps the first UI change low-risk and lets indexing, caching and multitrack decoding evolve independently.
+
+## Peak accumulator
+
+`ADM_WaveformPeakAccumulator` converts timestamped interleaved float PCM into fixed-size per-channel max-peak envelopes. It contains no Qt or playback state, so the decoder/indexer can run independently and feed the UI without coupling waveform math to the live editor stream.

@@ -38,3 +38,12 @@ jobs:
           trap 'rm -f "$TMP"' EXIT
           "$MOC" "$DIR/ADM_mwWaveform.h" -o "$TMP"
           clang++ -std=c++17 -fPIC $(pkg-config --cflags Qt6Widgets) -I"$DIR" -fsyntax-only "$TMP"
+
+      - name: Waveform peak accumulator
+        run: |
+          clang++ -std=c++17 \
+            -Iavidemux/common/ADM_editor/include \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformPeak.cpp \
+            avidemux/common/ADM_editor/tests/waveformPeakTest.cpp \
+            -o /tmp/waveform-peak-test
+          /tmp/waveform-peak-test
