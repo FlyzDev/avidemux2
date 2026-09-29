@@ -336,11 +336,9 @@ bool decodeInternalTrack(const ADM_WaveformSnapshot &snapshot,
                                track.internalTrackIndex, error))
                 return false;
         }
-        if (decoder->channels() != track.outputChannels || decoder->frequency() != track.outputFrequency)
-        {
-            setError(error, "Waveform source audio layout differs from active track layout");
-            return false;
-        }
+        // Some codecs (notably AAC with SBR) only reveal their final output
+        // frequency / channel layout after decoding the first packet. Validate
+        // against the accumulator inside decodeInternalSegment after run().
         if (!decodeInternalSegment(*decoder, segment, &accumulator, cancel, cancelOpaque, error))
             return false;
     }

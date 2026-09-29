@@ -48,6 +48,7 @@
 
 #include "ADM_QSettings.h"
 #include "ADM_default.h"
+#include "ADM_qtWaveformController.h"
 #include "ADM_qtx.h"
 #include "ADM_toolkitQt.h"
 
@@ -2874,6 +2875,7 @@ void MainWindow::notifyStatusBar(int level, const char *lead, const char *msg, i
 
 MainWindow::~MainWindow()
 {
+    ADM_QtWaveformController::cancel();
     renderDestroy(); // make sure render does not have back link to us
     delete thumbSlider;
     thumbSlider = NULL;
@@ -3521,6 +3523,7 @@ void UI_setTotalTime(uint64_t curTime)
 void UI_setSegments(uint32_t numOfSegs, uint64_t *segPts)
 {
     slider->setSegments(numOfSegs, segPts);
+    ADM_QtWaveformController::schedule(video_body, waveform);
 }
 /**
     \fn     UI_setMarkers(uint64_t Ptsa, uint32_t Ptsb )
@@ -3914,6 +3917,7 @@ void UI_setAudioTrackCount(int nb)
 {
     if (waveform)
         waveform->setTrackCount(nb);
+    ADM_QtWaveformController::schedule(video_body, waveform);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
     QString text = QCoreApplication::translate("qgui2", " (%n track(s))", NULL, nb);
 #else

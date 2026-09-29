@@ -27,6 +27,7 @@ jobs:
           grep -q 'ADM_mwWaveform.cpp' avidemux/qt4/ADM_userInterfaces/ADM_gui/CMakeLists.txt
           grep -q 'seekRequested(double' avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_mwWaveform.h
           grep -q 'DisplayChannels' avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_mwWaveform.h
+          grep -q 'ADM_qtWaveformController.cpp' avidemux/qt4/ADM_userInterfaces/ADM_gui/CMakeLists.txt
       - name: Qt6 waveform syntax
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
@@ -77,6 +78,12 @@ jobs:
             -I"$STUB_DIR" -Iavidemux_core/ADM_coreDemuxer/include/unix \
             $FFMPEG $INC -Iavidemux/common -Iavidemux/common/ADM_editor/src \
             avidemux/common/ADM_editor/src/audio/ADM_waveformIndexer.cpp
+          QT="$(pkg-config --cflags Qt6Widgets)"
+          eval clang++ -std=c++17 -fPIC -fsyntax-only \
+            -I"$STUB_DIR" -Iavidemux_core/ADM_coreDemuxer/include/unix \
+            $FFMPEG $QT $INC -Iavidemux/common -Iavidemux/common/ADM_editor/src \
+            -Iavidemux/qt4/ADM_userInterfaces/ADM_gui \
+            avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_qtWaveformController.cpp
 
       - name: Waveform cache roundtrip
         run: |

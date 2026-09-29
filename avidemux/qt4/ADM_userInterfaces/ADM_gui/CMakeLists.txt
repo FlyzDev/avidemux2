@@ -5,7 +5,7 @@ ADD_LIBRARY(${ADM_LIB} STATIC
   T_preview.cpp
   T_vumeter.cpp
   T_thumbSlider.cpp
-  file_qt4.cpp gui_none.cpp ADM_mwNavSlider.cpp ADM_mwWaveform.cpp
+  file_qt4.cpp gui_none.cpp ADM_mwNavSlider.cpp ADM_mwWaveform.cpp ADM_qtWaveformController.cpp
   ADM_qtray.cpp
   Q_dummyWidget.cpp
   FileAction.cpp
