@@ -30,7 +30,12 @@ xadd(--enable-w32threads)
 
 #  Cross compiler override (win32 & win64)
 xadd(--host-cc gcc)
-xadd(--nm ${CMAKE_CROSS_PREFIX}-nm)
+IF(CMAKE_HOST_WIN32)
+  # Native MSYS2/UCRT64 exposes binutils as ar/nm on PATH.
+  xadd(--nm nm)
+ELSE()
+  xadd(--nm ${CMAKE_CROSS_PREFIX}-nm)
+ENDIF()
 xadd(--extra-cflags  -I${CROSS}/include)
 IF(CMAKE_C_FLAGS)
   xadd(--extra-cflags ${CMAKE_C_FLAGS})
@@ -52,11 +57,13 @@ ADM_FF_ADD_OPTIONS()
 
 xadd(--cc "${CMAKE_C_COMPILER}")
 xadd(--ld "${CMAKE_C_COMPILER}")
-# Use the prefixed tool name rather than CMAKE_AR's absolute path. Native
-# MSYS2 CMake normalizes CMAKE_AR to a Windows D:/... path, which FFmpeg's
-# POSIX shell helpers cannot execute reliably. The prefixed tool is already
-# on PATH in both MXE cross builds and native MSYS2/MinGW builds.
-xadd(--ar "${CMAKE_CROSS_PREFIX}-ar")
+# Avoid CMAKE_AR's Windows D:/... spelling in FFmpeg's POSIX shell helpers.
+# Native MSYS2 uses plain ar, while Linux-hosted MXE uses the prefixed tool.
+IF(CMAKE_HOST_WIN32)
+  xadd(--ar ar)
+ELSE()
+  xadd(--ar "${CMAKE_CROSS_PREFIX}-ar")
+ENDIF()
 
 ADM_FF_SET_EXTRA_FLAGS()
 xadd(--enable-cross-compile)
