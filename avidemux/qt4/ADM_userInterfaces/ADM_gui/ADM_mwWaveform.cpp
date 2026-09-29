@@ -75,6 +75,8 @@ void ADM_mwWaveform::setTrackCount(int tracks)
     trackCount = tracks;
     if (trackCount < 2 && mode == DisplayTracks)
         mode = DisplayCombined;
+    if (mode == DisplayChannels && channelRows() == 0)
+        mode = DisplayCombined;
     updatePreferredHeight();
     update();
 }
@@ -82,6 +84,8 @@ void ADM_mwWaveform::setTrackCount(int tracks)
 void ADM_mwWaveform::setDisplayMode(DisplayMode newMode)
 {
     if (newMode == DisplayTracks && trackCount < 2)
+        newMode = DisplayCombined;
+    if (newMode == DisplayChannels && channelRows() == 0)
         newMode = DisplayCombined;
     if (mode == newMode)
         return;
@@ -94,6 +98,8 @@ void ADM_mwWaveform::clearPeaks(void)
 {
     combinedPeaks.clear();
     trackPeaks.clear();
+    channelPeaks.clear();
+    updatePreferredHeight();
     update();
 }
 
@@ -105,12 +111,50 @@ void ADM_mwWaveform::setCombinedPeaks(const std::vector<float> &peaks)
 
 void ADM_mwWaveform::setTrackPeaks(const std::vector<std::vector<float> > &peaks)
 {
+    channelPeaks.clear();
     trackPeaks = peaks;
     if (trackCount != static_cast<int>(trackPeaks.size()))
         trackCount = static_cast<int>(trackPeaks.size());
     rebuildCombinedPeaks();
+    if (mode == DisplayChannels)
+        mode = DisplayCombined;
     updatePreferredHeight();
     update();
+}
+
+void ADM_mwWaveform::setChannelPeaks(const std::vector<std::vector<std::vector<float> > > &peaks)
+{
+    channelPeaks = peaks;
+    trackCount = static_cast<int>(channelPeaks.size());
+    rebuildTrackPeaksFromChannels();
+    rebuildCombinedPeaks();
+    updatePreferredHeight();
+    update();
+}
+
+void ADM_mwWaveform::rebuildTrackPeaksFromChannels(void)
+{
+    trackPeaks.assign(channelPeaks.size(), std::vector<float>());
+    for (size_t track = 0; track < channelPeaks.size(); ++track)
+    {
+        size_t bins = 0;
+        for (size_t channel = 0; channel < channelPeaks[track].size(); ++channel)
+            bins = std::max(bins, channelPeaks[track][channel].size());
+        trackPeaks[track].assign(bins, 0.0f);
+        if (!bins)
+            continue;
+        for (size_t channel = 0; channel < channelPeaks[track].size(); ++channel)
+        {
+            const std::vector<float> &source = channelPeaks[track][channel];
+            if (source.empty())
+                continue;
+            for (size_t bin = 0; bin < bins; ++bin)
+            {
+                const size_t sourceIndex = std::min(source.size() - 1, (bin * source.size()) / bins);
+                trackPeaks[track][bin] = std::max(trackPeaks[track][bin], std::fabs(source[sourceIndex]));
+            }
+        }
+    }
 }
 
 void ADM_mwWaveform::rebuildCombinedPeaks(void)
@@ -149,11 +193,21 @@ int ADM_mwWaveform::timeToX(uint64_t time) const
     return static_cast<int>((static_cast<double>(time) / static_cast<double>(totalDuration)) * (width() - 1));
 }
 
+int ADM_mwWaveform::channelRows(void) const
+{
+    int rows = 0;
+    for (size_t track = 0; track < channelPeaks.size(); ++track)
+        rows += static_cast<int>(channelPeaks[track].size());
+    return rows;
+}
+
 void ADM_mwWaveform::updatePreferredHeight(void)
 {
     int wanted = 52;
     if (mode == DisplayTracks && trackCount > 1)
         wanted = std::min(180, std::max(64, trackCount * 34));
+    else if (mode == DisplayChannels && channelRows() > 0)
+        wanted = std::min(240, std::max(72, channelRows() * 30));
     setMinimumHeight(wanted);
     updateGeometry();
 }
@@ -238,6 +292,33 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
                 drawEmptyTrack(painter, row, tr("A%1").arg(i + 1));
         }
     }
+    else if (mode == DisplayChannels && channelRows() > 0)
+    {
+        const int rows = channelRows();
+        const int rowHeight = std::max(1, content.height() / rows);
+        int rowIndex = 0;
+        for (size_t track = 0; track < channelPeaks.size(); ++track)
+        {
+            for (size_t channel = 0; channel < channelPeaks[track].size(); ++channel, ++rowIndex)
+            {
+                const int top = content.top() + rowIndex * rowHeight;
+                const int bottom = (rowIndex == rows - 1) ? content.bottom() : top + rowHeight - 1;
+                QRect row(content.left(), top, content.width(), bottom - top + 1);
+                if (rowIndex > 0)
+                {
+                    QColor divider = palette().color(QPalette::Mid);
+                    divider.setAlpha(70);
+                    painter.setPen(divider);
+                    painter.drawLine(row.left(), row.top(), row.right(), row.top());
+                }
+                const std::vector<float> &peaks = channelPeaks[track][channel];
+                if (!peaks.empty())
+                    drawPeakVector(painter, row, peaks);
+                else
+                    drawEmptyTrack(painter, row, tr("A%1 C%2").arg(track + 1).arg(channel + 1));
+            }
+        }
+    }
     else
     {
         if (!combinedPeaks.empty())
@@ -283,15 +364,21 @@ void ADM_mwWaveform::contextMenuEvent(QContextMenuEvent *event)
     QMenu menu(this);
     QAction *combined = menu.addAction(tr("Combined waveform"));
     QAction *tracks = menu.addAction(tr("Separate audio tracks"));
+    QAction *channels = menu.addAction(tr("Separate channels"));
     combined->setCheckable(true);
     tracks->setCheckable(true);
+    channels->setCheckable(true);
     combined->setChecked(mode == DisplayCombined);
     tracks->setChecked(mode == DisplayTracks);
+    channels->setChecked(mode == DisplayChannels);
     tracks->setEnabled(trackCount > 1);
+    channels->setEnabled(channelRows() > 0);
 
     QAction *chosen = menu.exec(event->globalPos());
     if (chosen == combined)
         setDisplayMode(DisplayCombined);
     else if (chosen == tracks)
         setDisplayMode(DisplayTracks);
+    else if (chosen == channels)
+        setDisplayMode(DisplayChannels);
 }
