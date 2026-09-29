@@ -1,6 +1,9 @@
 name: Windows native MSVC experiment
 
 on:
+  push:
+    branches:
+      - win-native-experiment
   workflow_dispatch:
 
 jobs:
