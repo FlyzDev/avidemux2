@@ -60,6 +60,7 @@ private:
     int channelRows(void) const;
     void updatePreferredHeight(void);
     void drawPeakVector(QPainter &painter, const QRect &rect, const std::vector<float> &peaks) const;
+    void drawLaneLabel(QPainter &painter, const QRect &rect, const QString &label) const;
     void drawEmptyTrack(QPainter &painter, const QRect &rect, const QString &label) const;
     void rebuildCombinedPeaks(void);
     void rebuildTrackPeaksFromChannels(void);

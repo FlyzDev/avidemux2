@@ -227,13 +227,29 @@ void ADM_mwWaveform::drawPeakVector(QPainter &painter, const QRect &rect, const 
     }
 }
 
+void ADM_mwWaveform::drawLaneLabel(QPainter &painter, const QRect &rect, const QString &label) const
+{
+    if (label.isEmpty())
+        return;
+    const QFontMetrics metrics = painter.fontMetrics();
+    const int boxWidth = metrics.horizontalAdvance(label) + 10;
+    const int boxHeight = std::min(rect.height(), metrics.height() + 4);
+    QRect box(rect.left() + 3, rect.top() + 2, boxWidth, boxHeight);
+
+    QColor background = palette().color(QPalette::Base);
+    background.setAlpha(190);
+    painter.fillRect(box, background);
+
+    QColor text = palette().color(QPalette::Text);
+    text.setAlpha(190);
+    painter.setPen(text);
+    painter.drawText(box.adjusted(5, 0, -3, 0), Qt::AlignLeft | Qt::AlignVCenter, label);
+}
+
 void ADM_mwWaveform::drawEmptyTrack(QPainter &painter, const QRect &rect, const QString &label) const
 {
     drawPeakVector(painter, rect, std::vector<float>());
-    QColor text = palette().color(QPalette::Text);
-    text.setAlpha(150);
-    painter.setPen(text);
-    painter.drawText(rect.adjusted(6, 0, -4, 0), Qt::AlignLeft | Qt::AlignVCenter, label);
+    drawLaneLabel(painter, rect, label);
 }
 
 void ADM_mwWaveform::paintEvent(QPaintEvent *event)
@@ -272,10 +288,14 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
                 painter.setPen(divider);
                 painter.drawLine(row.left(), row.top(), row.right(), row.top());
             }
+            const QString label = tr("A%1").arg(i + 1);
             if (i < static_cast<int>(trackPeaks.size()) && !trackPeaks[i].empty())
+            {
                 drawPeakVector(painter, row, trackPeaks[i]);
+                drawLaneLabel(painter, row, label);
+            }
             else
-                drawEmptyTrack(painter, row, tr("A%1").arg(i + 1));
+                drawEmptyTrack(painter, row, label);
         }
     }
     else if (mode == DisplayChannels && channelRows() > 0)
@@ -297,11 +317,15 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
                     painter.setPen(divider);
                     painter.drawLine(row.left(), row.top(), row.right(), row.top());
                 }
+                const QString label = tr("A%1 C%2").arg(track + 1).arg(channel + 1);
                 const std::vector<float> &peaks = channelPeaks[track][channel];
                 if (!peaks.empty())
+                {
                     drawPeakVector(painter, row, peaks);
+                    drawLaneLabel(painter, row, label);
+                }
                 else
-                    drawEmptyTrack(painter, row, tr("A%1 C%2").arg(track + 1).arg(channel + 1));
+                    drawEmptyTrack(painter, row, label);
             }
         }
     }
