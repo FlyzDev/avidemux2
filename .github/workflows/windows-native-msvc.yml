@@ -1,0 +1,97 @@
+name: Windows native MSVC experiment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Install build tools
+        shell: pwsh
+        run: |
+          choco install nasm yasm -y --no-progress
+          python -m pip install aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:\Qt
+
+      - name: Install native dependencies
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_ROOT\vcpkg.exe" install libass:x64-windows sdl3:x64-windows
+      - name: Configure and build core
+        shell: pwsh
+        run: |
+          $install = "$env:RUNNER_TEMP\avidemux-install"
+          cmake -S avidemux_core -B buildCore `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_INSTALL_PREFIX="$install" `
+            -DAVIDEMUX_VERSION=2.8.2 `
+            -DUSE_NVENC=OFF
+          cmake --build buildCore --config Release --parallel 4
+          cmake --install buildCore --config Release
+
+      - name: Configure and build Qt6 application
+        shell: pwsh
+        run: |
+          $install = "$env:RUNNER_TEMP\avidemux-install"
+          $qt = "C:\Qt\6.8.3\msvc2022_64"
+          cmake -S avidemux/qt4 -B buildQt6 `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_INSTALL_PREFIX="$install" `
+            -DCMAKE_PREFIX_PATH="$qt" `
+            -DENABLE_QT6=ON `
+            -DUSE_SDL3=OFF
+          cmake --build buildQt6 --config Release --parallel 4
+          cmake --install buildQt6 --config Release
+
+      - name: Configure and build common plugins
+        shell: pwsh
+        run: |
+          $install = "$env:RUNNER_TEMP\avidemux-install"
+          $qt = "C:\Qt\6.8.3\msvc2022_64"
+          cmake -S avidemux_plugins -B buildPluginsCommon `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_INSTALL_PREFIX="$install" `
+            -DCMAKE_PREFIX_PATH="$qt" `
+            -DPLUGIN_UI=COMMON
+          cmake --build buildPluginsCommon --config Release --parallel 4
+          cmake --install buildPluginsCommon --config Release
+
+      - name: Deploy Qt runtime
+        shell: pwsh
+        run: |
+          $install = "$env:RUNNER_TEMP\avidemux-install"
+          $qt = "C:\Qt\6.8.3\msvc2022_64"
+          $exe = Get-ChildItem -Path $install -Filter avidemux.exe -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "avidemux.exe not found" }
+          & "$qt\bin\windeployqt.exe" --release --no-translations $exe.FullName
+          "AVIDEMUX_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify waveform linkage
+        shell: pwsh
+        run: |
+          Write-Host "Executable: $env:AVIDEMUX_EXE"
+          if (-not (Test-Path $env:AVIDEMUX_EXE)) { throw "Missing executable" }
+          Get-ChildItem "$env:RUNNER_TEMP\avidemux-install" -Recurse |
+            Select-Object FullName, Length |
+            Out-String -Width 300 |
+            Write-Host
+
+      - name: Package native build
+        shell: pwsh
+        run: |
+          $install = "$env:RUNNER_TEMP\avidemux-install"
+          Compress-Archive -Path "$install\*" -DestinationPath "avidemux-waveform-win64-msvc.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: avidemux-waveform-win64-msvc
+          if-no-files-found: error
+          retention-days: 7
+          path: avidemux-waveform-win64-msvc.zip
