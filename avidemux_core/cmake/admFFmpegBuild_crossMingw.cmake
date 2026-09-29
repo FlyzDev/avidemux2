@@ -52,7 +52,11 @@ ADM_FF_ADD_OPTIONS()
 
 xadd(--cc "${CMAKE_C_COMPILER}")
 xadd(--ld "${CMAKE_C_COMPILER}")
-xadd(--ar "${CMAKE_AR}")
+# Use the prefixed tool name rather than CMAKE_AR's absolute path. Native
+# MSYS2 CMake normalizes CMAKE_AR to a Windows D:/... path, which FFmpeg's
+# POSIX shell helpers cannot execute reliably. The prefixed tool is already
+# on PATH in both MXE cross builds and native MSYS2/MinGW builds.
+xadd(--ar "${CMAKE_CROSS_PREFIX}-ar")
 
 ADM_FF_SET_EXTRA_FLAGS()
 xadd(--enable-cross-compile)
