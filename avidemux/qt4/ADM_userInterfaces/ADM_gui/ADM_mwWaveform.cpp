@@ -108,8 +108,36 @@ void ADM_mwWaveform::setTrackPeaks(const std::vector<std::vector<float> > &peaks
     trackPeaks = peaks;
     if (trackCount != static_cast<int>(trackPeaks.size()))
         trackCount = static_cast<int>(trackPeaks.size());
+    rebuildCombinedPeaks();
     updatePreferredHeight();
     update();
+}
+
+void ADM_mwWaveform::rebuildCombinedPeaks(void)
+{
+    size_t outputBins = 0;
+    for (size_t track = 0; track < trackPeaks.size(); ++track)
+        outputBins = std::max(outputBins, trackPeaks[track].size());
+
+    combinedPeaks.assign(outputBins, 0.0f);
+    if (!outputBins)
+        return;
+
+    // This is a visual overview, not an audio mix. Using the maximum absolute
+    // envelope across tracks avoids phase cancellation and clipping artifacts
+    // when independent container audio streams are displayed together.
+    for (size_t track = 0; track < trackPeaks.size(); ++track)
+    {
+        const std::vector<float> &source = trackPeaks[track];
+        if (source.empty())
+            continue;
+        for (size_t bin = 0; bin < outputBins; ++bin)
+        {
+            const size_t sourceIndex = std::min(source.size() - 1,
+                                                (bin * source.size()) / outputBins);
+            combinedPeaks[bin] = std::max(combinedPeaks[bin], std::fabs(source[sourceIndex]));
+        }
+    }
 }
 
 int ADM_mwWaveform::timeToX(uint64_t time) const

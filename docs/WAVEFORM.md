@@ -7,7 +7,7 @@ The waveform feature is intentionally split into two layers:
 
 ## Display behavior
 
-- Default: one combined waveform for the active audio mix.
+- Default: one combined overview waveform across active audio tracks. This is a max-peak envelope, not an audio sum, so independent streams cannot cancel or clip each other visually.
 - Optional: separate rows for each active audio track (right-click the waveform).
 - A/B markers, current playhead and selection are rendered on top of the waveform.
 - Left-clicking the waveform seeks through the existing navigation slider path.
