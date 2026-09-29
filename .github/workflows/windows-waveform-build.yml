@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: windows-waveform-${{ github.ref }}
-  cancel-in-progress: true
+  group: windows-waveform-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   mingw-smoke:
@@ -49,6 +49,85 @@ jobs:
           grep -q 'ADM_qtWaveformController.cpp' avidemux/qt4/ADM_userInterfaces/ADM_gui/CMakeLists.txt
           grep -q 'ADM_waveformIndexer.cpp' avidemux/common/ADM_editor/src/CMakeLists.txt
           test -f avidemux/qt4/i18n/CMakeLists.txt
+  native-msys2-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Set up MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            base-devel
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-ffmpeg
+
+      - name: Native Windows waveform checks
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          CXX=c++
+          INC=-Iavidemux/common/ADM_editor/include
+
+          $CXX -std=c++17 $INC \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformPeak.cpp \
+            avidemux/common/ADM_editor/tests/waveformPeakTest.cpp \
+            -o /tmp/waveform-peak-test.exe
+          /tmp/waveform-peak-test.exe
+
+          $CXX -std=c++17 $INC \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformCache.cpp \
+            avidemux/common/ADM_editor/tests/waveformCacheTest.cpp \
+            -o /tmp/waveform-cache-test.exe
+          /tmp/waveform-cache-test.exe
+
+          DIR=avidemux/qt4/ADM_userInterfaces/ADM_gui
+          $CXX -std=c++17 $(pkg-config --cflags Qt6Widgets) -fsyntax-only "$DIR/ADM_mwWaveform.cpp"
+
+          STUB_DIR=$(mktemp -d)
+          trap 'rm -rf "$STUB_DIR"' EXIT
+          printf '%s\n' \
+            '#ifndef ADM_CORE_H' \
+            '#define ADM_CORE_H' \
+            '#define ADM_INSTALL_DIR "C:/"' \
+            '#define ADM_RELATIVE_LIB_DIR "lib"' \
+            '#define ADM_PLUGIN_DIR "ADM_plugins6"' \
+            '#define ADM_CPU_64BIT' \
+            '#define ADM_CPU_X86_64' \
+            '#define HAVE_INTTYPES_H 1' \
+            '#define HAVE_STDINT_H 1' \
+            '#define attribute_align_arg' \
+            '#endif' > "$STUB_DIR/ADM_coreConfig.h"
+
+          ALL_INC=$(find avidemux/common avidemux_core -type d -name include -print | sed 's#^#-I#' | tr '\n' ' ')
+          FFMPEG=$(pkg-config --cflags libavutil libavcodec libavformat)
+          QT=$(pkg-config --cflags Qt6Widgets)
+
+          eval $CXX -std=c++17 -fsyntax-only -I"$STUB_DIR" \
+            -Iavidemux_core/ADM_coreDemuxer/include/unix $FFMPEG $ALL_INC \
+            -Iavidemux/common -Iavidemux/common/ADM_editor/src \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformSnapshot.cpp
+
+          eval $CXX -std=c++17 -fsyntax-only -I"$STUB_DIR" \
+            -Iavidemux_core/ADM_coreDemuxer/include/unix $FFMPEG $ALL_INC \
+            -Iavidemux/common -Iavidemux/common/ADM_editor/src \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformIndexer.cpp
+
+          eval $CXX -std=c++17 -fsyntax-only -I"$STUB_DIR" \
+            -Iavidemux_core/ADM_coreDemuxer/include/unix $FFMPEG $QT $ALL_INC \
+            -Iavidemux/common -Iavidemux/common/ADM_editor/src \
+            -Iavidemux/qt4/ADM_userInterfaces/ADM_gui \
+            avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_qtWaveformController.cpp
+
   windows-package:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[winbuild]')
     runs-on: ubuntu-24.04
