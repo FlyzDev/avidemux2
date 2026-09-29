@@ -75,12 +75,18 @@ jobs:
       - name: Build Windows x64 Qt6 package
         run: |
           set -euxo pipefail
+          RUNNER_UID=$(id -u)
+          RUNNER_GID=$(id -g)
+          sudo chown -R 1000:1000 "$PWD"
+          trap 'sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$PWD"' EXIT
           docker run --rm \
             --user 1000:1000 \
             --volume "$PWD:/workspaces/avidemux" \
             --workdir /workspaces/avidemux \
             avidemux-waveform-mxe:latest \
             bash -lc 'bash bootStrapCrossMingwQt6_2026.sh'
+          sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$PWD"
+          trap - EXIT
 
           test -f avidemux64/avidemux.exe
           python3 - <<'PY'
@@ -98,19 +104,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
-          ffmpeg -hide_banner -loglevel error -y \
-            -f lavfi -i 'testsrc2=size=640x360:rate=30:duration=12' \
-            -f lavfi -i 'sine=frequency=440:sample_rate=48000:duration=12' \
-            -f lavfi -i 'sine=frequency=880:sample_rate=48000:duration=12' \
-            -filter_complex '[1:a]volume=0.35[a1];[2:a]volume=0.8[a2]' \
-            -map 0:v -map '[a1]' -map '[a2]' \
-            -c:v libx264 -pix_fmt yuv420p -preset veryfast \
-            -c:a aac -metadata:s:a:0 title='Track 1 - 440 Hz' \
-            -metadata:s:a:1 title='Track 2 - 880 Hz' \
-            windows-waveform-multitrack-test.mkv
-          ffprobe -v error \
-            -show_entries stream=index,codec_type,channels,sample_rate:stream_tags=title \
-            -of compact windows-waveform-multitrack-test.mkv
+          ./tools/generate-waveform-fixture.sh windows-waveform-multitrack-test.mkv
 
       - name: Upload Windows build and fixture
         uses: actions/upload-artifact@v4

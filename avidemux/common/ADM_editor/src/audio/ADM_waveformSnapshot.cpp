@@ -17,13 +17,12 @@ static void ADM_waveformFileMetadata(const std::string &fileName, uint64_t *size
     if (fileName.empty())
         return;
 
-    struct stat st;
-    if (stat(fileName.c_str(), &st) != 0)
-        return;
+    const int64_t portableSize = ADM_fileSize(fileName.c_str());
+    if (size && portableSize >= 0)
+        *size = static_cast<uint64_t>(portableSize);
 
-    if (size && st.st_size >= 0)
-        *size = static_cast<uint64_t>(st.st_size);
-    if (modified)
+    struct stat st;
+    if (modified && stat(fileName.c_str(), &st) == 0)
         *modified = static_cast<int64_t>(st.st_mtime);
 }
 

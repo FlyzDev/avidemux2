@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <fstream>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -36,11 +35,12 @@ bool readMagic(const std::string &path, uint32_t *magic)
     if (!magic)
         return false;
     unsigned char bytes[4] = {0, 0, 0, 0};
-    std::ifstream in(path.c_str(), std::ios::binary);
-    if (!in)
+    FILE *file = ADM_fopen(path.c_str(), "rb");
+    if (!file)
         return false;
-    in.read(reinterpret_cast<char *>(bytes), sizeof(bytes));
-    if (in.gcount() != static_cast<std::streamsize>(sizeof(bytes)))
+    const size_t read = ADM_fread(bytes, 1, sizeof(bytes), file);
+    ADM_fclose(file);
+    if (read != sizeof(bytes))
         return false;
     *magic = (static_cast<uint32_t>(bytes[3]) << 24) |
              (static_cast<uint32_t>(bytes[2]) << 16) |
@@ -129,6 +129,10 @@ public:
 
         outputChannels = codec->getOutputChannels();
         outputFrequency = codec->getOutputFrequency();
+        if (!outputChannels)
+            outputChannels = decoderHeader.channels;
+        if (!outputFrequency)
+            outputFrequency = decoderHeader.frequency;
         if (!outputChannels || outputChannels > MAX_CHANNELS ||
             outputFrequency < MIN_SAMPLING_RATE || outputFrequency > MAX_SAMPLING_RATE)
         {
@@ -166,10 +170,14 @@ public:
         if (!codec->run(&packet[0], packetBytes, &pcm[0], &outputValues))
             return true;
 
-        const uint32_t currentChannels = codec->getOutputChannels();
-        const uint32_t currentFrequency = codec->getOutputFrequency();
+        uint32_t currentChannels = codec->getOutputChannels();
+        uint32_t currentFrequency = codec->getOutputFrequency();
+        if (!currentChannels)
+            currentChannels = outputChannels;
+        if (!currentFrequency)
+            currentFrequency = outputFrequency;
         if (!currentChannels || currentChannels > MAX_CHANNELS ||
-            !currentFrequency || currentFrequency > MAX_SAMPLING_RATE)
+            currentFrequency < MIN_SAMPLING_RATE || currentFrequency > MAX_SAMPLING_RATE)
             return false;
         if (currentChannels != outputChannels || currentFrequency != outputFrequency)
         {
