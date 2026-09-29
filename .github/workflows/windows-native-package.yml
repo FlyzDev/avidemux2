@@ -54,6 +54,7 @@ jobs:
           set -euxo pipefail
           export PATH="/ucrt64/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
+          export QTDIR=/ucrt64
           ROOT="$PWD"
           PREFIX="$ROOT/native-win-prefix"
           mkdir -p "$PREFIX"
@@ -76,6 +77,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
             -DENABLE_QT6=true \
+            -DLRELEASE_EXECUTABLE=/ucrt64/bin/lrelease.exe \
             -DCMAKE_AR=/ucrt64/bin/ar.exe \
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
@@ -93,6 +95,7 @@ jobs:
           set -euxo pipefail
           export PATH="/ucrt64/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
+          export QTDIR=/ucrt64
           ROOT="$PWD"
           PREFIX="$ROOT/native-win-prefix"
 
