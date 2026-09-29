@@ -33,8 +33,7 @@ jobs:
           DIR=avidemux/qt4/ADM_userInterfaces/ADM_gui
           clang++ -std=c++17 -fPIC $(pkg-config --cflags Qt6Widgets) -fsyntax-only "$DIR/ADM_mwWaveform.cpp"
           MOC="$(brew --prefix qtbase)/share/qt/libexec/moc"
-          TMP="$RUNNER_TEMP/moc_ADM_mwWaveform.cpp"
+          TMP="$DIR/moc_ADM_mwWaveform.ci.cpp"
+          trap 'rm -f "$TMP"' EXIT
           "$MOC" "$DIR/ADM_mwWaveform.h" -o "$TMP"
-          cp "$TMP" "$DIR/moc_ADM_mwWaveform.ci.cpp"
-          clang++ -std=c++17 -fPIC $(pkg-config --cflags Qt6Widgets) -I"$DIR" -fsyntax-only "$DIR/moc_ADM_mwWaveform.ci.cpp"
-          rm -f "$DIR/moc_ADM_mwWaveform.ci.cpp"
+          clang++ -std=c++17 -fPIC $(pkg-config --cflags Qt6Widgets) -I"$DIR" -fsyntax-only "$TMP"
