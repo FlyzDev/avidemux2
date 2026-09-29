@@ -230,6 +230,7 @@ TARGET_LINK_LIBRARIES(avidemux3_${QT_EXTENSION} PRIVATE
    ADM_UI_${QT_LIBRARY_EXTENSION}6
    ADM_shell${QT_LIBRARY_EXTENSION}
    ADM_editor6_interface
+   ADM_editor6
    ADM_toolkit6
    ADM_coreVideoFilter6
    ADM_internalVideoFilter6
