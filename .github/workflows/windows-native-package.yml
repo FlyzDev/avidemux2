@@ -69,7 +69,8 @@ jobs:
             -DCMAKE_OBJCOPY=/ucrt64/bin/objcopy.exe \
             -DCMAKE_OBJDUMP=/ucrt64/bin/objdump.exe \
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
-            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
+            -DMINGW=TRUE
           cmake --build buildNativeCore --parallel 2
           cmake --install buildNativeCore
           cmake -S avidemux/qt4 -B buildNativeQt6 -G Ninja \
@@ -82,7 +83,8 @@ jobs:
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
-            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
+            -DMINGW=TRUE
           cmake --build buildNativeQt6 --parallel 2
           cmake --install buildNativeQt6
 
@@ -108,7 +110,8 @@ jobs:
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
-            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
+            -DMINGW=TRUE
           cmake --build buildNativePluginsCommon --parallel 2
           cmake --install buildNativePluginsCommon
           cmake -S avidemux_plugins -B buildNativePluginsQt6 -G Ninja \
@@ -121,7 +124,8 @@ jobs:
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
-            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
+            -DMINGW=TRUE
           cmake --build buildNativePluginsQt6 --parallel 2
           cmake --install buildNativePluginsQt6
 
