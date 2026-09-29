@@ -9,11 +9,14 @@
 // Avidemux core provides UTF-8-aware file operations on Windows. Keep the
 // cache module independent from generated core headers so its format tests can
 // still be built as a small standalone binary.
+extern "C"
+{
 extern FILE *ADM_fopen(const char *file, const char *mode);
 extern size_t ADM_fread(void *ptr, size_t size, size_t n, FILE *stream);
 extern size_t ADM_fwrite(const void *ptr, size_t size, size_t n, FILE *stream);
 extern int ADM_fclose(FILE *file);
 extern uint8_t ADM_eraseFile(const char *name);
+}
 extern uint8_t ADM_renameFile(const char *source, const char *target);
 
 namespace
