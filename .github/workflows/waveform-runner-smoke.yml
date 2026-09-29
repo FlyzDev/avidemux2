@@ -47,3 +47,27 @@ jobs:
             avidemux/common/ADM_editor/tests/waveformPeakTest.cpp \
             -o /tmp/waveform-peak-test
           /tmp/waveform-peak-test
+
+      - name: Waveform snapshot syntax
+        run: |
+          export PATH="/opt/homebrew/bin:$PATH"
+          cat > /tmp/ADM_coreConfig.h <<'EOF'
+          #ifndef ADM_CORE_H
+          #define ADM_CORE_H
+          #define ADM_INSTALL_DIR "/tmp"
+          #define ADM_RELATIVE_LIB_DIR "lib"
+          #define ADM_PLUGIN_DIR "ADM_plugins6"
+          #define ADM_CPU_64BIT
+          #define ADM_CPU_ARM64
+          #define HAVE_GETTIMEOFDAY
+          #define HAVE_INTTYPES_H 1
+          #define HAVE_STDINT_H 1
+          #define HAVE_SYS_TYPES_H
+          #define attribute_align_arg
+          #endif
+          INC=$(find avidemux/common avidemux_core -type d -name include -print | sed 's#^#-I#' | tr '\n' ' ')
+          FFMPEG="$(pkg-config --cflags libavutil libavcodec libavformat)"
+          eval clang++ -std=c++17 -fsyntax-only \
+            -I/tmp -Iavidemux_core/ADM_coreDemuxer/include/unix \
+            $FFMPEG $INC -Iavidemux/common -Iavidemux/common/ADM_editor/src \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformSnapshot.cpp

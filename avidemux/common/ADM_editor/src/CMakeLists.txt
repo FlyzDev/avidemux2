@@ -26,6 +26,7 @@ TARGET_SOURCES(${ADM_LIB} PRIVATE
   audio/ADM_edAudioTrackFromVideo.cpp
   audio/ADM_edAudioTrack.cpp
   audio/ADM_waveformPeak.cpp
+  audio/ADM_waveformSnapshot.cpp
 )
 
 TARGET_INCLUDE_DIRECTORIES(${ADM_LIB} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)

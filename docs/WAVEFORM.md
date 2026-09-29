@@ -21,3 +21,7 @@ This separation keeps the first UI change low-risk and lets indexing, caching an
 ## Peak accumulator
 
 `ADM_WaveformPeakAccumulator` converts timestamped interleaved float PCM into fixed-size per-channel max-peak envelopes. It contains no Qt or playback state, so the decoder/indexer can run independently and feed the UI without coupling waveform math to the live editor stream.
+
+## Editor snapshot
+
+`ADM_buildWaveformSnapshot` copies only immutable indexing inputs out of the live editor: source filenames, edit-segment timing, active track identity, channel count and sample rate. The future worker must consume this snapshot rather than retaining pointers to the live `ADM_Composer` or its audio streams. Internal and external audio tracks are both represented.
