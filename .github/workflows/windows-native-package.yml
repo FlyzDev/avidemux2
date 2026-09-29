@@ -54,18 +54,6 @@ jobs:
           set -euxo pipefail
           export PATH="/ucrt64/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
-          mkdir -p "$PWD/.ci-mingw-bin"
-          for tool in ar nm ranlib strip objcopy objdump windres; do
-            if ! command -v "x86_64-w64-mingw32-$tool" >/dev/null 2>&1; then
-              printf '#!/usr/bin/env bash\nexec %s "$@"\n' "$tool" > "$PWD/.ci-mingw-bin/x86_64-w64-mingw32-$tool"
-              chmod +x "$PWD/.ci-mingw-bin/x86_64-w64-mingw32-$tool"
-            fi
-          done
-          export PATH="$PWD/.ci-mingw-bin:$PATH"
-          export CROSS_PREFIX=x86_64-w64-mingw32
-          export TOOLCHAIN_LOCATION=/ucrt64
-          export CROSS_C_COMPILER=gcc
-          export CROSS_CXX_COMPILER=g++
           ROOT="$PWD"
           PREFIX="$ROOT/native-win-prefix"
           mkdir -p "$PREFIX"
@@ -79,8 +67,8 @@ jobs:
             -DCMAKE_STRIP=/ucrt64/bin/strip.exe \
             -DCMAKE_OBJCOPY=/ucrt64/bin/objcopy.exe \
             -DCMAKE_OBJDUMP=/ucrt64/bin/objdump.exe \
-            -DCROSS=/ucrt64 \
-            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
+            -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
           cmake --build buildNativeCore --parallel 2
           cmake --install buildNativeCore
           cmake -S avidemux/qt4 -B buildNativeQt6 -G Ninja \
@@ -91,8 +79,8 @@ jobs:
             -DCMAKE_AR=/ucrt64/bin/ar.exe \
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
-            -DCROSS=/ucrt64 \
-            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
+            -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
           cmake --build buildNativeQt6 --parallel 2
           cmake --install buildNativeQt6
 
@@ -105,10 +93,6 @@ jobs:
           set -euxo pipefail
           export PATH="/ucrt64/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
-          export CROSS_PREFIX=x86_64-w64-mingw32
-          export TOOLCHAIN_LOCATION=/ucrt64
-          export CROSS_C_COMPILER=gcc
-          export CROSS_CXX_COMPILER=g++
           ROOT="$PWD"
           PREFIX="$ROOT/native-win-prefix"
 
@@ -120,8 +104,8 @@ jobs:
             -DCMAKE_AR=/ucrt64/bin/ar.exe \
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
-            -DCROSS=/ucrt64 \
-            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
+            -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
           cmake --build buildNativePluginsCommon --parallel 2
           cmake --install buildNativePluginsCommon
           cmake -S avidemux_plugins -B buildNativePluginsQt6 -G Ninja \
@@ -133,8 +117,8 @@ jobs:
             -DCMAKE_AR=/ucrt64/bin/ar.exe \
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
-            -DCROSS=/ucrt64 \
-            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
+            -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
+            -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe
           cmake --build buildNativePluginsQt6 --parallel 2
           cmake --install buildNativePluginsQt6
 
