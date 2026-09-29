@@ -25,3 +25,7 @@ This separation keeps the first UI change low-risk and lets indexing, caching an
 ## Editor snapshot
 
 `ADM_buildWaveformSnapshot` copies only immutable indexing inputs out of the live editor: source filenames, edit-segment timing, active track identity, channel count and sample rate. The future worker must consume this snapshot rather than retaining pointers to the live `ADM_Composer` or its audio streams. Internal and external audio tracks are both represented.
+
+## Disk cache
+
+Waveform cache identity includes a schema version, requested bin count, timeline duration, source path/size/mtime, edit-segment timing, and active track/channel metadata. Cache files use a small versioned binary format and are written through a temporary file before rename; a mismatched key or malformed payload is treated as a cache miss.

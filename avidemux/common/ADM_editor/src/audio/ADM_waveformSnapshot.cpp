@@ -7,6 +7,26 @@
 #include "ADM_edEditableAudioTrack.h"
 #include "ADM_segment.h"
 
+#include <sys/stat.h>
+
+
+static void ADM_waveformFileMetadata(const std::string &fileName, uint64_t *size, int64_t *modified)
+{
+    if (size) *size = 0;
+    if (modified) *modified = 0;
+    if (fileName.empty())
+        return;
+
+    struct stat st;
+    if (stat(fileName.c_str(), &st) != 0)
+        return;
+
+    if (size && st.st_size >= 0)
+        *size = static_cast<uint64_t>(st.st_size);
+    if (modified)
+        *modified = static_cast<int64_t>(st.st_mtime);
+}
+
 bool ADM_buildWaveformSnapshot(ADM_Composer *composer, ADM_WaveformSnapshot *snapshot)
 {
     if (!composer || !snapshot || !composer->isFileOpen())
@@ -30,6 +50,7 @@ bool ADM_buildWaveformSnapshot(ADM_Composer *composer, ADM_WaveformSnapshot *sna
         const char *name = video->_aviheader->getMyName();
         if (name)
             source.fileName = name;
+        ADM_waveformFileMetadata(source.fileName, &source.fileSize, &source.modifiedTime);
         snapshot->sources.push_back(source);
     }
 
@@ -87,6 +108,7 @@ bool ADM_buildWaveformSnapshot(ADM_Composer *composer, ADM_WaveformSnapshot *sna
                 continue;
             item.sourceType = ADM_WAVEFORM_TRACK_EXTERNAL;
             item.externalFileName = external->getMyName();
+            ADM_waveformFileMetadata(item.externalFileName, &item.externalFileSize, &item.externalModifiedTime);
         }
         else
         {

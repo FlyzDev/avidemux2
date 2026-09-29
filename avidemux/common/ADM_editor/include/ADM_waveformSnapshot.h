@@ -15,6 +15,10 @@ enum ADM_WaveformTrackSourceType
 struct ADM_WaveformSourceSnapshot
 {
     std::string fileName;
+    uint64_t fileSize;
+    int64_t modifiedTime;
+
+    ADM_WaveformSourceSnapshot() : fileSize(0), modifiedTime(0) {}
 };
 
 struct ADM_WaveformSegmentSnapshot
@@ -34,6 +38,13 @@ struct ADM_WaveformTrackSnapshot
     std::string externalFileName;
     uint32_t outputChannels;
     uint32_t outputFrequency;
+    uint64_t externalFileSize;
+    int64_t externalModifiedTime;
+
+    ADM_WaveformTrackSnapshot()
+        : sourceType(ADM_WAVEFORM_TRACK_INTERNAL), activeIndex(-1), poolIndex(-1),
+          internalTrackIndex(-1), outputChannels(0), outputFrequency(0),
+          externalFileSize(0), externalModifiedTime(0) {}
 };
 
 struct ADM_WaveformSnapshot
