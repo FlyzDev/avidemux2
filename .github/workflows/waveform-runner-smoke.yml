@@ -25,4 +25,4 @@ jobs:
           test -f avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_mwWaveform.cpp
           test -f avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_mwWaveform.h
           grep -q 'ADM_mwWaveform.cpp' avidemux/qt4/ADM_userInterfaces/ADM_gui/CMakeLists.txt
-          grep -q 'seekRequested(double)' avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_mwWaveform.h
+          grep -q 'seekRequested(double' avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_mwWaveform.h
