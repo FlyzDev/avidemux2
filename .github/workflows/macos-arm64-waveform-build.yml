@@ -1,0 +1,74 @@
+name: macOS ARM64 waveform build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  macos-arm64:
+    runs-on: [self-hosted, macOS, ARM64, waveform]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Prepare case-sensitive source worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="$HOME/AvidemuxWaveformCI.sparseimage"
+          VOLUME="/Volumes/AvidemuxWaveformCI"
+          if ! mount | grep -q " on $VOLUME "; then
+            if [ ! -f "$IMAGE" ]; then
+              hdiutil create -size 20g -type SPARSE \
+                -fs 'Case-sensitive APFS' -volname AvidemuxWaveformCI \
+                "$HOME/AvidemuxWaveformCI"
+            fi
+            hdiutil attach "$IMAGE" -nobrowse
+          fi
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove --force "$VOLUME/src" 2>/dev/null || true
+          rm -rf "$VOLUME/src"
+          git worktree add --detach "$VOLUME/src" "$GITHUB_SHA"
+          git -C "$VOLUME/src" submodule update --init --recursive
+
+      - name: Build Avidemux ARM64 Qt6
+        shell: bash
+        run: |
+          set -euo pipefail
+          VOLUME="/Volumes/AvidemuxWaveformCI"
+          cd "$VOLUME/src"
+          export PATH="/opt/homebrew/bin:$PATH"
+          export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:/opt/homebrew/share/pkgconfig"
+          bash bootStrapMacOS_Monterey.arm64.sh \
+            --no-bundle --nopkg --with-internal-libmp4v2
+          test -x out/bin/avidemux3_qt6
+
+      - name: Package ARM64 build
+        shell: bash
+        run: |
+          set -euo pipefail
+          VOLUME="/Volumes/AvidemuxWaveformCI"
+          OUT="$GITHUB_WORKSPACE/avidemux-waveform-macos-arm64"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+          cp -R "$VOLUME/src/out/." "$OUT/"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$OUT" "$GITHUB_WORKSPACE/avidemux-waveform-macos-arm64.zip"
+
+      - name: Upload ARM64 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: avidemux-waveform-macos-arm64
+          if-no-files-found: error
+          retention-days: 14
+          path: avidemux-waveform-macos-arm64.zip
+
+      - name: Cleanup worktree
+        if: always()
+        shell: bash
+        run: |
+          VOLUME="/Volumes/AvidemuxWaveformCI"
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove --force "$VOLUME/src" 2>/dev/null || true

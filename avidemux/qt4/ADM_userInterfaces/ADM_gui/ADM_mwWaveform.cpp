@@ -232,7 +232,12 @@ void ADM_mwWaveform::drawLaneLabel(QPainter &painter, const QRect &rect, const Q
     if (label.isEmpty())
         return;
     const QFontMetrics metrics = painter.fontMetrics();
-    const int boxWidth = metrics.horizontalAdvance(label) + 10;
+#if QT_VERSION < QT_VERSION_CHECK(5, 11, 0)
+    const int textWidth = metrics.width(label);
+#else
+    const int textWidth = metrics.horizontalAdvance(label);
+#endif
+    const int boxWidth = textWidth + 10;
     const int boxHeight = std::min(rect.height(), metrics.height() + 4);
     QRect box(rect.left() + 3, rect.top() + 2, boxWidth, boxHeight);
 

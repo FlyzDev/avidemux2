@@ -90,7 +90,7 @@ jobs:
             --volume "$PWD:/workspaces/avidemux" \
             --workdir /workspaces/avidemux \
             avidemux-waveform-mxe:latest \
-            bash -lc 'bash bootStrapCrossMingwQt6_2026.sh'
+            bash -lc 'bash bootStrapCrossMingwQt6_2026.sh --without-cli'
           sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$PWD"
           trap - EXIT
 
