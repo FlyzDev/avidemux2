@@ -1,0 +1,137 @@
+name: Windows native waveform package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Set up MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            base-devel
+            cmake
+            ninja
+            nasm
+            yasm
+            zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-ffmpeg
+            mingw-w64-ucrt-x86_64-SDL2
+            mingw-w64-ucrt-x86_64-libass
+            mingw-w64-ucrt-x86_64-libvpx
+            mingw-w64-ucrt-x86_64-aom
+            mingw-w64-ucrt-x86_64-opus
+            mingw-w64-ucrt-x86_64-fdk-aac
+            mingw-w64-ucrt-x86_64-lame
+            mingw-w64-ucrt-x86_64-libx264
+            mingw-w64-ucrt-x86_64-x265
+            mingw-w64-ucrt-x86_64-xvidcore
+
+      - name: Build core and Qt app
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          export PATH="/ucrt64/bin:$PATH"
+          export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
+          ROOT="$PWD"
+          PREFIX="$ROOT/native-win-prefix"
+          mkdir -p "$PREFIX"
+
+          cmake -S avidemux_core -B buildNativeCore -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PREFIX"
+          cmake --build buildNativeCore --parallel 2
+          cmake --install buildNativeCore
+          cmake -S avidemux/qt4 -B buildNativeQt6 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+            -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
+            -DENABLE_QT6=true
+          cmake --build buildNativeQt6 --parallel 2
+          cmake --install buildNativeQt6
+
+          echo "PREFIX CONTENTS"
+          find "$PREFIX" -maxdepth 3 -type f | sort | head -200
+
+      - name: Build common and Qt plugins
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          export PATH="/ucrt64/bin:$PATH"
+          export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
+          ROOT="$PWD"
+          PREFIX="$ROOT/native-win-prefix"
+
+          cmake -S avidemux_plugins -B buildNativePluginsCommon -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+            -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
+            -DPLUGIN_UI=COMMON
+          cmake --build buildNativePluginsCommon --parallel 2
+          cmake --install buildNativePluginsCommon
+          cmake -S avidemux_plugins -B buildNativePluginsQt6 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+            -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
+            -DPLUGIN_UI=QT4 \
+            -DENABLE_QT6=true
+          cmake --build buildNativePluginsQt6 --parallel 2
+          cmake --install buildNativePluginsQt6
+
+      - name: Find GUI executable
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          find native-win-prefix -type f \( -iname 'avidemux*.exe' -o -iname '*qt*.exe' \) -print
+          EXE=$(find native-win-prefix -type f -iname 'avidemux*.exe' | head -1)
+          test -n "$EXE"
+          echo "AVIDEMUX_EXE=$EXE" >> "$GITHUB_ENV"
+
+      - name: Deploy Qt runtime
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          EXE_WIN=$(cygpath -w "$AVIDEMUX_EXE")
+          EXE_DIR=$(dirname "$AVIDEMUX_EXE")
+          /ucrt64/bin/windeployqt6.exe --release --no-translations "$EXE_WIN" || /ucrt64/bin/windeployqt.exe --release --no-translations "$EXE_WIN"
+          cp -f /ucrt64/bin/libgcc_s_seh-1.dll "$EXE_DIR/" || true
+          cp -f /ucrt64/bin/libstdc++-6.dll "$EXE_DIR/" || true
+          cp -f /ucrt64/bin/libwinpthread-1.dll "$EXE_DIR/" || true
+      - name: Generate multi-track fixture
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          ./tools/generate-waveform-fixture.sh windows-waveform-multitrack-test.mkv
+
+      - name: Package native Windows build
+        shell: pwsh
+        run: |
+          Compress-Archive -Path native-win-prefix\* -DestinationPath avidemux-waveform-win64-native.zip -Force
+          Get-Item avidemux-waveform-win64-native.zip | Format-List Name,Length
+
+      - name: Upload Windows native build
+        uses: actions/upload-artifact@v4
+        with:
+          name: avidemux-waveform-windows-native-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            avidemux-waveform-win64-native.zip
+            windows-waveform-multitrack-test.mkv
