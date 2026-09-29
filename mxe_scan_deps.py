@@ -25,7 +25,20 @@ SYSTEM_DLLS = {
 }
 
 def is_system_dll(name):
-    return name.lower() in SYSTEM_DLLS or name.lower().startswith(("api-ms-win-", "ext-ms-win-"))
+    name_l = name.lower()
+    if name_l in SYSTEM_DLLS or name_l.startswith(("api-ms-win-", "ext-ms-win-")):
+        return True
+
+    # When the resolver itself runs on Windows, trust the OS as the
+    # authoritative source for system DLLs instead of trying to bundle them.
+    # This covers libraries such as ncrypt.dll which are part of Windows but
+    # may not be present in the static allow-list above.
+    if os.name == "nt":
+        windir = os.environ.get("WINDIR", r"C:\\Windows")
+        for subdir in ("System32", "SysWOW64"):
+            if os.path.isfile(os.path.join(windir, subdir, name)):
+                return True
+    return False
 
 def get_imports(file_path):
     deps = []
