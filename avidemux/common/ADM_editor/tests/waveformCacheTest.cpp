@@ -55,7 +55,11 @@ int main()
     data.tracks[0][1].push_back(0.50f);
     data.tracks[0][1].push_back(1.00f);
 
+#ifdef _WIN32
+    const std::string path = "avidemux-waveform-cache-test.bin";
+#else
     const std::string path = "/tmp/avidemux-waveform-cache-test.bin";
+#endif
     std::remove(path.c_str());
     assert(ADM_writeWaveformCache(path, key, data));
 
