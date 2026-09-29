@@ -18,7 +18,8 @@ ADM_mwWaveform::ADM_mwWaveform(QWidget *parent)
       markerATime(0),
       markerBTime(0),
       trackCount(0),
-      mode(DisplayCombined)
+      mode(DisplayCombined),
+      generating(false)
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setMinimumHeight(52);
@@ -78,6 +79,14 @@ void ADM_mwWaveform::setTrackCount(int tracks)
     if (mode == DisplayChannels && channelRows() == 0)
         mode = DisplayCombined;
     updatePreferredHeight();
+    update();
+}
+
+void ADM_mwWaveform::setGenerating(bool active)
+{
+    if (generating == active)
+        return;
+    generating = active;
     update();
 }
 
@@ -208,8 +217,12 @@ void ADM_mwWaveform::updatePreferredHeight(void)
         wanted = std::min(180, std::max(64, trackCount * 34));
     else if (mode == DisplayChannels && channelRows() > 0)
         wanted = std::min(240, std::max(72, channelRows() * 30));
+
+    const bool changed = minimumHeight() != wanted;
     setMinimumHeight(wanted);
     updateGeometry();
+    if (changed)
+        emit preferredHeightChanged(wanted);
 }
 
 void ADM_mwWaveform::drawPeakVector(QPainter &painter, const QRect &rect, const std::vector<float> &peaks) const
@@ -353,7 +366,25 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
         if (!combinedPeaks.empty())
             drawPeakVector(painter, content, combinedPeaks);
         else
-            drawEmptyTrack(painter, content, tr("Master / combined waveform"));
+            drawEmptyTrack(painter, content, generating ? tr("Generating waveform…")
+                                                        : tr("Master / combined waveform"));
+    }
+
+    if (generating && !combinedPeaks.empty())
+    {
+        const QString status = tr("Generating waveform…");
+        const QFontMetrics metrics = painter.fontMetrics();
+#if QT_VERSION < QT_VERSION_CHECK(5, 11, 0)
+        const int textWidth = metrics.width(status);
+#else
+        const int textWidth = metrics.horizontalAdvance(status);
+#endif
+        QRect statusRect(width() - textWidth - 16, 4, textWidth + 10, metrics.height() + 4);
+        QColor background = palette().color(QPalette::Base);
+        background.setAlpha(210);
+        painter.fillRect(statusRect, background);
+        painter.setPen(palette().color(QPalette::Text));
+        painter.drawText(statusRect, Qt::AlignCenter, status);
     }
 
     if (totalDuration)

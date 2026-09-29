@@ -5,8 +5,7 @@
 #include <QCoreApplication>
 #include <QMetaObject>
 #include <QPointer>
-#include <QRunnable>
-#include <QThreadPool>
+#include <QThread>
 #include <QTimer>
 
 #include "ADM_default.h"
@@ -50,7 +49,7 @@ std::string cachePathForKey(const std::string &key)
     return path;
 }
 
-class WaveformIndexTask : public QRunnable
+class WaveformIndexTask : public QThread
 {
 public:
     WaveformIndexTask(const ADM_WaveformSnapshot &snapshot,
@@ -58,9 +57,39 @@ public:
                       const std::string &cachePath,
                       const std::shared_ptr<std::atomic<bool> > &cancel,
                       const QPointer<ADM_mwWaveform> &target)
-        : _snapshot(snapshot), _key(key), _cachePath(cachePath), _cancel(cancel), _target(target)
+        : _snapshot(snapshot), _key(key), _cachePath(cachePath), _cancel(cancel), _target(target),
+          _partialTracks(snapshot.tracks.size())
     {
-        setAutoDelete(true);
+    }
+
+    static void progressThunk(void *opaque, uint32_t trackIndex,
+                              const std::vector<std::vector<float> > &channelPeaks)
+    {
+        WaveformIndexTask *self = static_cast<WaveformIndexTask *>(opaque);
+        if (self)
+            self->publishProgress(trackIndex, channelPeaks);
+    }
+
+    void publishProgress(uint32_t trackIndex, const std::vector<std::vector<float> > &channelPeaks)
+    {
+        if (!_cancel || _cancel->load() || trackIndex >= _partialTracks.size())
+            return;
+        _partialTracks[trackIndex] = channelPeaks;
+
+        QCoreApplication *application = QCoreApplication::instance();
+        if (!application)
+            return;
+
+        const std::string key = _key;
+        const std::shared_ptr<std::atomic<bool> > cancel = _cancel;
+        const QPointer<ADM_mwWaveform> target = _target;
+        const std::shared_ptr<std::vector<std::vector<std::vector<float> > > > partial(
+            new std::vector<std::vector<std::vector<float> > >(_partialTracks));
+        QMetaObject::invokeMethod(application, [key, cancel, target, partial]() {
+            if (!cancel || cancel->load() || key != activeKey || target.isNull())
+                return;
+            target->setChannelPeaks(*partial);
+        }, Qt::QueuedConnection);
     }
 
     void run(void) override
@@ -82,7 +111,8 @@ public:
         {
             std::string error;
             ok = ADM_generateWaveform(_snapshot, kDefaultBins, data.get(), &error,
-                                      cancellationRequested, _cancel.get());
+                                      cancellationRequested, _cancel.get(),
+                                      progressThunk, this);
             if (!ok && !_cancel->load())
                 ADM_warning("Waveform indexing failed: %s\n", error.c_str());
             if (ok && !_cancel->load() && !_cachePath.empty())
@@ -90,7 +120,22 @@ public:
         }
 
         if (!ok || _cancel->load())
+        {
+            if (!ok && !_cancel->load())
+            {
+                QCoreApplication *application = QCoreApplication::instance();
+                const std::string key = _key;
+                const std::shared_ptr<std::atomic<bool> > cancel = _cancel;
+                const QPointer<ADM_mwWaveform> target = _target;
+                if (application)
+                    QMetaObject::invokeMethod(application, [key, cancel, target]() {
+                        if (!cancel || cancel->load() || key != activeKey || target.isNull())
+                            return;
+                        target->setGenerating(false);
+                    }, Qt::QueuedConnection);
+            }
             return;
+        }
 
         QCoreApplication *application = QCoreApplication::instance();
         if (!application)
@@ -104,6 +149,7 @@ public:
                 return;
             target->setDuration(data->durationUs);
             target->setChannelPeaks(data->tracks);
+            target->setGenerating(false);
             ADM_info("Waveform ready (%s, %d track(s))\n",
                      cacheHit ? "cache" : "indexed", static_cast<int>(data->tracks.size()));
         }, Qt::QueuedConnection);
@@ -115,6 +161,7 @@ private:
     std::string _cachePath;
     std::shared_ptr<std::atomic<bool> > _cancel;
     QPointer<ADM_mwWaveform> _target;
+    std::vector<std::vector<std::vector<float> > > _partialTracks;
 };
 
 void start(void)
@@ -132,21 +179,31 @@ void start(void)
         return;
 
     waveform->clearPeaks();
+    waveform->setGenerating(false);
     if (!composer || !composer->isFileOpen())
         return;
+    waveform->setGenerating(true);
 
     ADM_WaveformSnapshot snapshot;
     if (!ADM_buildWaveformSnapshot(composer, &snapshot) || snapshot.tracks.empty() || !snapshot.durationUs)
+    {
+        waveform->setGenerating(false);
         return;
+    }
 
     const std::string key = ADM_waveformCacheKey(snapshot, kDefaultBins);
     if (key.empty())
+    {
+        waveform->setGenerating(false);
         return;
+    }
 
     activeKey = key;
     cancelToken.reset(new std::atomic<bool>(false));
-    QThreadPool::globalInstance()->start(
-        new WaveformIndexTask(snapshot, key, cachePathForKey(key), cancelToken, waveform));
+    WaveformIndexTask *task = new WaveformIndexTask(snapshot, key, cachePathForKey(key),
+                                                     cancelToken, waveform);
+    QObject::connect(task, &QThread::finished, task, &QObject::deleteLater);
+    task->start(QThread::LowPriority);
 }
 }
 
@@ -158,7 +215,7 @@ void ADM_QtWaveformController::schedule(ADM_Composer *composer, ADM_mwWaveform *
         return;
 
     startQueued = true;
-    QTimer::singleShot(0, waveform, []() { start(); });
+    QTimer::singleShot(250, waveform, []() { start(); });
 }
 
 void ADM_QtWaveformController::cancel(void)

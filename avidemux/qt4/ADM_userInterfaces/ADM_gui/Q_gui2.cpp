@@ -764,9 +764,19 @@ MainWindow::MainWindow(const vector<IScriptEngine *> &scriptEngines) : _scriptEn
     connect(slider, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
     connect(qslider, SIGNAL(sliderAction(int)), this, SLOT(sliderWheel(int)));
 
-    // Waveform overview. Peak extraction is fed asynchronously by the waveform indexer.
+    // Waveform overview. Keep it inside the navigation layout, below the seek slider.
+    // The stock navigation dock is hard-capped at 120 px, so adding the waveform
+    // without growing the dock clips the transport buttons below it.
+    const int navigationBaseHeight = ui.navigationWidget->minimumHeight();
     waveform = new ADM_mwWaveform(ui.dockWidgetContents_2);
     ui.verticalLayout_8->insertWidget(1, waveform);
+    const auto resizeNavigationForWaveform = [this, navigationBaseHeight](int waveformHeight) {
+        const int wanted = navigationBaseHeight + waveformHeight;
+        ui.navigationWidget->setMinimumHeight(wanted);
+        ui.navigationWidget->setMaximumHeight(wanted);
+    };
+    resizeNavigationForWaveform(waveform->minimumHeight());
+    connect(waveform, &ADM_mwWaveform::preferredHeightChanged, this, resizeNavigationForWaveform);
     connect(waveform, SIGNAL(seekRequested(double)), this, SLOT(waveformSeekRequested(double)));
 
     connect(&dragTimer, SIGNAL(timeout()), this, SLOT(dragTimerTimeout()));

@@ -28,6 +28,7 @@ public:
     void setTrackCount(int tracks);
     void setDisplayMode(DisplayMode mode);
     DisplayMode displayMode(void) const { return mode; }
+    void setGenerating(bool active);
 
     void clearPeaks(void);
     void setCombinedPeaks(const std::vector<float> &peaks);
@@ -39,6 +40,7 @@ public:
 
 signals:
     void seekRequested(double ratio);
+    void preferredHeightChanged(int height);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -52,6 +54,7 @@ private:
     uint64_t markerBTime;
     int trackCount;
     DisplayMode mode;
+    bool generating;
     std::vector<float> combinedPeaks;
     std::vector<std::vector<float> > trackPeaks;
     std::vector<std::vector<std::vector<float> > > channelPeaks;

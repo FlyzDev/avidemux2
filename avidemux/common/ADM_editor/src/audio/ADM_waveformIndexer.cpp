@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <chrono>
 #include <limits>
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include "ADM_waveformIndexer.h"
@@ -22,6 +24,33 @@ static const uint32_t kMaxEmptyPackets = 128;
 bool cancelled(ADM_WaveformCancelFn fn, void *opaque)
 {
     return fn && fn(opaque);
+}
+
+void giveForegroundChance(uint32_t &packetCounter)
+{
+    ++packetCounter;
+    // Waveform indexing is best-effort background work. Yield regularly so a
+    // foreground seek / playback request wins CPU and disk time immediately.
+    if ((packetCounter & 63U) == 0U)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    else if ((packetCounter & 15U) == 0U)
+        std::this_thread::yield();
+}
+
+void publishProgress(ADM_WaveformProgressFn progress,
+                     void *progressOpaque,
+                     uint32_t trackIndex,
+                     const ADM_WaveformPeakAccumulator &accumulator,
+                     std::chrono::steady_clock::time_point &lastPublish,
+                     bool force = false)
+{
+    if (!progress)
+        return;
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    if (!force && std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPublish).count() < 200)
+        return;
+    lastPublish = now;
+    progress(progressOpaque, trackIndex, accumulator.channelPeaks());
 }
 
 void setError(std::string *target, const std::string &message)
@@ -217,6 +246,10 @@ bool decodeInternalSegment(IndependentInternalDecoder &decoder,
                            ADM_WaveformPeakAccumulator *accumulator,
                            ADM_WaveformCancelFn cancel,
                            void *cancelOpaque,
+                           ADM_WaveformProgressFn progress,
+                           void *progressOpaque,
+                           uint32_t trackIndex,
+                           std::chrono::steady_clock::time_point *lastPublish,
                            std::string *error)
 {
     if (!accumulator || !decoder.seek(segment.referenceStartUs))
@@ -228,6 +261,7 @@ bool decodeInternalSegment(IndependentInternalDecoder &decoder,
     const uint64_t referenceEnd = segment.referenceStartUs + segment.durationUs;
     uint64_t fallbackDts = segment.referenceStartUs;
     uint32_t emptyPackets = 0;
+    uint32_t backgroundPacketCounter = 0;
 
     while (!cancelled(cancel, cancelOpaque))
     {
@@ -236,6 +270,7 @@ bool decodeInternalSegment(IndependentInternalDecoder &decoder,
         const float *pcm = NULL;
         if (!decoder.next(&packetDts, &frames, &pcm))
             break;
+        giveForegroundChance(backgroundPacketCounter);
         if (!frames || !pcm)
         {
             if (++emptyPackets >= kMaxEmptyPackets)
@@ -286,6 +321,8 @@ bool decodeInternalSegment(IndependentInternalDecoder &decoder,
         const uint64_t timelineUs = segment.timelineStartUs + relativeUs;
         accumulator->addInterleaved(pcm + static_cast<size_t>(firstFrame) * channels,
                                     usableFrames, timelineUs);
+        if (lastPublish)
+            publishProgress(progress, progressOpaque, trackIndex, *accumulator, *lastPublish);
 
         if (endUs >= referenceEnd)
             break;
@@ -305,6 +342,9 @@ bool decodeInternalTrack(const ADM_WaveformSnapshot &snapshot,
                          std::vector<std::vector<float> > *output,
                          ADM_WaveformCancelFn cancel,
                          void *cancelOpaque,
+                         ADM_WaveformProgressFn progress,
+                         void *progressOpaque,
+                         uint32_t trackIndex,
                          std::string *error)
 {
     if (!output || !track.outputChannels || !track.outputFrequency)
@@ -319,6 +359,8 @@ bool decodeInternalTrack(const ADM_WaveformSnapshot &snapshot,
     }
 
     std::vector<std::unique_ptr<IndependentInternalDecoder> > decoders(snapshot.sources.size());
+    std::chrono::steady_clock::time_point lastPublish =
+        std::chrono::steady_clock::now() - std::chrono::milliseconds(250);
     for (size_t segmentIndex = 0; segmentIndex < snapshot.segments.size(); ++segmentIndex)
     {
         if (cancelled(cancel, cancelOpaque))
@@ -347,11 +389,13 @@ bool decodeInternalTrack(const ADM_WaveformSnapshot &snapshot,
         // Some codecs (notably AAC with SBR) only reveal their final output
         // frequency / channel layout after decoding the first packet. Validate
         // against the accumulator inside decodeInternalSegment after run().
-        if (!decodeInternalSegment(*decoder, segment, &accumulator, cancel, cancelOpaque, error))
+        if (!decodeInternalSegment(*decoder, segment, &accumulator, cancel, cancelOpaque,
+                                   progress, progressOpaque, trackIndex, &lastPublish, error))
             return false;
     }
 
     *output = accumulator.channelPeaks();
+    publishProgress(progress, progressOpaque, trackIndex, accumulator, lastPublish, true);
     return true;
 }
 
@@ -361,6 +405,9 @@ bool decodeExternalTrack(const ADM_WaveformSnapshot &snapshot,
                          std::vector<std::vector<float> > *output,
                          ADM_WaveformCancelFn cancel,
                          void *cancelOpaque,
+                         ADM_WaveformProgressFn progress,
+                         void *progressOpaque,
+                         uint32_t trackIndex,
                          std::string *error)
 {
     if (!output || track.externalFileName.empty())
@@ -390,13 +437,17 @@ bool decodeExternalTrack(const ADM_WaveformSnapshot &snapshot,
 
     std::vector<float> pcm(static_cast<size_t>(MAX_SAMPLING_RATE) * MAX_CHANNELS);
     uint32_t emptyPackets = 0;
+    uint32_t backgroundPacketCounter = 0;
     uint64_t fallbackDts = 0;
+    std::chrono::steady_clock::time_point lastPublish =
+        std::chrono::steady_clock::now() - std::chrono::milliseconds(250);
     while (!cancelled(cancel, cancelOpaque))
     {
         uint32_t frames = 0;
         uint64_t dts = ADM_AUDIO_NO_DTS;
         if (!decoder->getPCMPacket(&pcm[0], static_cast<uint32_t>(pcm.size()), &frames, &dts))
             break;
+        giveForegroundChance(backgroundPacketCounter);
         if (!frames)
         {
             if (++emptyPackets >= kMaxEmptyPackets)
@@ -413,6 +464,7 @@ bool decodeExternalTrack(const ADM_WaveformSnapshot &snapshot,
         if (usableFrames > maxFrames)
             usableFrames = static_cast<uint32_t>(maxFrames);
         accumulator.addInterleaved(&pcm[0], usableFrames, startUs);
+        publishProgress(progress, progressOpaque, trackIndex, accumulator, lastPublish);
         fallbackDts = startUs + framesToUs(frames, frequency);
     }
 
@@ -423,6 +475,7 @@ bool decodeExternalTrack(const ADM_WaveformSnapshot &snapshot,
     }
 
     *output = accumulator.channelPeaks();
+    publishProgress(progress, progressOpaque, trackIndex, accumulator, lastPublish, true);
     return true;
 }
 }
@@ -432,7 +485,9 @@ bool ADM_generateWaveform(const ADM_WaveformSnapshot &snapshot,
                           ADM_WaveformCacheData *output,
                           std::string *errorMessage,
                           ADM_WaveformCancelFn cancel,
-                          void *cancelOpaque)
+                          void *cancelOpaque,
+                          ADM_WaveformProgressFn progress,
+                          void *progressOpaque)
 {
     if (!output || !targetBins || !snapshot.durationUs)
     {
@@ -457,10 +512,12 @@ bool ADM_generateWaveform(const ADM_WaveformSnapshot &snapshot,
         bool ok = false;
         if (track.sourceType == ADM_WAVEFORM_TRACK_INTERNAL)
             ok = decodeInternalTrack(snapshot, track, targetBins, &output->tracks[trackIndex],
-                                     cancel, cancelOpaque, errorMessage);
+                                     cancel, cancelOpaque, progress, progressOpaque,
+                                     static_cast<uint32_t>(trackIndex), errorMessage);
         else if (track.sourceType == ADM_WAVEFORM_TRACK_EXTERNAL)
             ok = decodeExternalTrack(snapshot, track, targetBins, &output->tracks[trackIndex],
-                                     cancel, cancelOpaque, errorMessage);
+                                     cancel, cancelOpaque, progress, progressOpaque,
+                                     static_cast<uint32_t>(trackIndex), errorMessage);
         if (!ok)
         {
             output->clear();
