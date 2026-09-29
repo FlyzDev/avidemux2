@@ -22,7 +22,7 @@ ADM_mwWaveform::ADM_mwWaveform(QWidget *parent)
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setMinimumHeight(52);
-    setToolTip(tr("Audio waveform. Left-click to seek, right-click to change waveform view."));
+    setToolTip(tr("Audio waveform. A1/master is shown by default. Left-click to seek, right-click to change waveform view."));
 }
 
 ADM_mwWaveform::~ADM_mwWaveform()
@@ -159,29 +159,15 @@ void ADM_mwWaveform::rebuildTrackPeaksFromChannels(void)
 
 void ADM_mwWaveform::rebuildCombinedPeaks(void)
 {
-    size_t outputBins = 0;
-    for (size_t track = 0; track < trackPeaks.size(); ++track)
-        outputBins = std::max(outputBins, trackPeaks[track].size());
-
-    combinedPeaks.assign(outputBins, 0.0f);
-    if (!outputBins)
+    combinedPeaks.clear();
+    if (trackPeaks.empty())
         return;
 
-    // This is a visual overview, not an audio mix. Using the maximum absolute
-    // envelope across tracks avoids phase cancellation and clipping artifacts
-    // when independent container audio streams are displayed together.
-    for (size_t track = 0; track < trackPeaks.size(); ++track)
-    {
-        const std::vector<float> &source = trackPeaks[track];
-        if (source.empty())
-            continue;
-        for (size_t bin = 0; bin < outputBins; ++bin)
-        {
-            const size_t sourceIndex = std::min(source.size() - 1,
-                                                (bin * source.size()) / outputBins);
-            combinedPeaks[bin] = std::max(combinedPeaks[bin], std::fabs(source[sourceIndex]));
-        }
-    }
+    // Track A1 is treated as the default / master waveform. This matches common
+    // multi-track capture layouts (for example OBS master mix on A1 with isolated
+    // mic / desktop tracks following it) and avoids inventing a mix across
+    // independent container audio streams.
+    combinedPeaks = trackPeaks.front();
 }
 
 int ADM_mwWaveform::timeToX(uint64_t time) const
@@ -324,7 +310,7 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
         if (!combinedPeaks.empty())
             drawPeakVector(painter, content, combinedPeaks);
         else
-            drawEmptyTrack(painter, content, tr("Combined waveform"));
+            drawEmptyTrack(painter, content, tr("Master waveform (A1)"));
     }
 
     if (totalDuration)
@@ -362,7 +348,7 @@ void ADM_mwWaveform::mousePressEvent(QMouseEvent *event)
 void ADM_mwWaveform::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu menu(this);
-    QAction *combined = menu.addAction(tr("Combined waveform"));
+    QAction *combined = menu.addAction(tr("Master waveform (A1)"));
     QAction *tracks = menu.addAction(tr("Separate audio tracks"));
     QAction *channels = menu.addAction(tr("Separate channels"));
     combined->setCheckable(true);

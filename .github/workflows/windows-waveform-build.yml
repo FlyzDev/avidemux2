@@ -59,6 +59,12 @@ jobs:
           fetch-depth: 2
           submodules: recursive
 
+      - name: Free runner disk for MXE
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af || true
+          df -h /
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
