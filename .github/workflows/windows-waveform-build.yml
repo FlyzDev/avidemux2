@@ -1,0 +1,123 @@
+name: Windows waveform build
+
+on:
+  push:
+    branches:
+      - feat/waveform-ui
+  workflow_dispatch:
+
+concurrency:
+  group: windows-waveform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mingw-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Install MinGW x64
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-mingw-w64-x86-64
+      - name: Cross-compile portable waveform core
+        run: |
+          set -euxo pipefail
+          CXX=x86_64-w64-mingw32-g++
+          INC=-Iavidemux/common/ADM_editor/include
+
+          $CXX -std=c++17 $INC \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformPeak.cpp \
+            avidemux/common/ADM_editor/tests/waveformPeakTest.cpp \
+            -o /tmp/waveform-peak-test.exe
+
+          $CXX -std=c++17 $INC \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformCache.cpp \
+            avidemux/common/ADM_editor/tests/waveformCacheTest.cpp \
+            -o /tmp/waveform-cache-test.exe
+
+          file /tmp/waveform-peak-test.exe /tmp/waveform-cache-test.exe
+
+      - name: Source invariants
+        run: |
+          git diff --check HEAD^ HEAD || git diff --check
+          grep -q 'DisplayChannels' avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_mwWaveform.h
+          grep -q 'ADM_qtWaveformController.cpp' avidemux/qt4/ADM_userInterfaces/ADM_gui/CMakeLists.txt
+          grep -q 'ADM_waveformIndexer.cpp' avidemux/common/ADM_editor/src/CMakeLists.txt
+          test -f avidemux/qt4/i18n/CMakeLists.txt
+  windows-package:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[winbuild]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build cached Avidemux MXE toolchain
+        uses: docker/build-push-action@v6
+        with:
+          context: .devcontainer_mxe64
+          file: .devcontainer_mxe64/Dockerfile
+          tags: avidemux-waveform-mxe:latest
+          load: true
+          cache-from: type=gha,scope=avidemux-waveform-mxe
+          cache-to: type=gha,mode=max,scope=avidemux-waveform-mxe
+
+      - name: Build Windows x64 Qt6 package
+        run: |
+          set -euxo pipefail
+          docker run --rm \
+            --user 1000:1000 \
+            --volume "$PWD:/workspaces/avidemux" \
+            --workdir /workspaces/avidemux \
+            avidemux-waveform-mxe:latest \
+            bash -lc 'bash bootStrapCrossMingwQt6_2026.sh'
+
+          test -f avidemux64/avidemux.exe
+          python3 - <<'PY'
+          import pathlib, zipfile
+          root = pathlib.Path('avidemux64')
+          out = pathlib.Path('avidemux-waveform-win64-qt6.zip')
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for p in root.rglob('*'):
+                  if p.is_file():
+                      z.write(p, p.relative_to(root.parent))
+          print(out, out.stat().st_size)
+          PY
+
+      - name: Generate multi-track test fixture
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -hide_banner -loglevel error -y \
+            -f lavfi -i 'testsrc2=size=640x360:rate=30:duration=12' \
+            -f lavfi -i 'sine=frequency=440:sample_rate=48000:duration=12' \
+            -f lavfi -i 'sine=frequency=880:sample_rate=48000:duration=12' \
+            -filter_complex '[1:a]volume=0.35[a1];[2:a]volume=0.8[a2]' \
+            -map 0:v -map '[a1]' -map '[a2]' \
+            -c:v libx264 -pix_fmt yuv420p -preset veryfast \
+            -c:a aac -metadata:s:a:0 title='Track 1 - 440 Hz' \
+            -metadata:s:a:1 title='Track 2 - 880 Hz' \
+            windows-waveform-multitrack-test.mkv
+          ffprobe -v error \
+            -show_entries stream=index,codec_type,channels,sample_rate:stream_tags=title \
+            -of compact windows-waveform-multitrack-test.mkv
+
+      - name: Upload Windows build and fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: avidemux-waveform-windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            avidemux-waveform-win64-qt6.zip
+            windows-waveform-multitrack-test.mkv
