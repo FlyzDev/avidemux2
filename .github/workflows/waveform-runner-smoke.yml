@@ -73,6 +73,10 @@ jobs:
             -I"$STUB_DIR" -Iavidemux_core/ADM_coreDemuxer/include/unix \
             $FFMPEG $INC -Iavidemux/common -Iavidemux/common/ADM_editor/src \
             avidemux/common/ADM_editor/src/audio/ADM_waveformSnapshot.cpp
+          eval clang++ -std=c++17 -fsyntax-only \
+            -I"$STUB_DIR" -Iavidemux_core/ADM_coreDemuxer/include/unix \
+            $FFMPEG $INC -Iavidemux/common -Iavidemux/common/ADM_editor/src \
+            avidemux/common/ADM_editor/src/audio/ADM_waveformIndexer.cpp
 
       - name: Waveform cache roundtrip
         run: |

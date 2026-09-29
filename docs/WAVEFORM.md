@@ -29,3 +29,7 @@ This separation keeps the first UI change low-risk and lets indexing, caching an
 ## Disk cache
 
 Waveform cache identity includes a schema version, requested bin count, timeline duration, source path/size/mtime, edit-segment timing, and active track/channel metadata. Cache files use a small versioned binary format and are written through a temporary file before rename; a mismatched key or malformed payload is treated as a cache miss.
+
+## Independent indexer
+
+`ADM_generateWaveform` reopens internal media through fresh demuxer/audio-decoder instances and projects each edit segment back onto timeline time before adding PCM to the peak accumulator. One decoder is retained per source for each active track so heavily cut timelines can seek without reopening the same file for every cut. External audio uses a separate `create_edAudioExternal()` instance. No live editor audio stream is consumed or seeked.
