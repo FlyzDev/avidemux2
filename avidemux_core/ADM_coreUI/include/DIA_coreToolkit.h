@@ -52,6 +52,10 @@ ADM_COREUI6_EXPORT void            GUI_Verbose(void);
 ADM_COREUI6_EXPORT void            GUI_Quiet(void);
 // Is the UI in quiet mode ?
 ADM_COREUI6_EXPORT uint8_t         GUI_isQuiet(void);
+// Suppress progress / working dialogs only in the calling thread. This is
+// intended for background workers which must not create GUI objects.
+ADM_COREUI6_EXPORT void            GUI_SuppressProgressForCurrentThread(bool suppress);
+ADM_COREUI6_EXPORT uint8_t         GUI_isProgressSuppressedForCurrentThread(void);
 //
 ADM_COREUI6_EXPORT void            UI_purge(void);
 //

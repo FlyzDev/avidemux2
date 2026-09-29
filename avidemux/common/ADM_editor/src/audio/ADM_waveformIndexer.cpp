@@ -13,6 +13,7 @@
 #include "ADM_audioStream.h"
 #include "ADM_coreDemuxer.h"
 #include "ADM_default.h"
+#include "DIA_coreToolkit.h"
 #include "ADM_edAudioTrackExternal.h"
 #include "ADM_waveformPeak.h"
 
@@ -20,6 +21,22 @@ namespace
 {
 static const uint32_t kPacketBytes = 64 * 1024;
 static const uint32_t kMaxEmptyPackets = 128;
+
+class ScopedProgressUiSuppression
+{
+public:
+    ScopedProgressUiSuppression()
+        : previous(GUI_isProgressSuppressedForCurrentThread() != 0)
+    {
+        GUI_SuppressProgressForCurrentThread(true);
+    }
+    ~ScopedProgressUiSuppression()
+    {
+        GUI_SuppressProgressForCurrentThread(previous);
+    }
+private:
+    bool previous;
+};
 
 bool cancelled(ADM_WaveformCancelFn fn, void *opaque)
 {
@@ -489,6 +506,11 @@ bool ADM_generateWaveform(const ADM_WaveformSnapshot &snapshot,
                           ADM_WaveformProgressFn progress,
                           void *progressOpaque)
 {
+    // Avidemux demuxers may create modal progress dialogs while opening a
+    // source (e.g. MP4 "Decoding frame type" or MKV indexing). This function
+    // runs on a waveform worker thread, so creating Qt GUI objects here can
+    // deadlock the main window via synchronous SendMessage on Windows.
+    ScopedProgressUiSuppression suppressWorkerProgressUi;
     if (!output || !targetBins || !snapshot.durationUs)
     {
         setError(errorMessage, "Invalid waveform indexing request");

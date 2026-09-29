@@ -1,5 +1,6 @@
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <QCoreApplication>
@@ -25,6 +26,18 @@ static std::string activeKey;
 static bool startQueued = false;
 static ADM_Composer *pendingComposer = NULL;
 static QPointer<ADM_mwWaveform> pendingWaveform;
+
+struct WaveformProgressState
+{
+    explicit WaveformProgressState(size_t trackCount)
+        : tracks(trackCount), updateQueued(false)
+    {
+    }
+
+    std::mutex mutex;
+    std::vector<std::vector<std::vector<float> > > tracks;
+    bool updateQueued;
+};
 
 bool cancellationRequested(void *opaque)
 {
@@ -58,7 +71,7 @@ public:
                       const std::shared_ptr<std::atomic<bool> > &cancel,
                       const QPointer<ADM_mwWaveform> &target)
         : _snapshot(snapshot), _key(key), _cachePath(cachePath), _cancel(cancel), _target(target),
-          _partialTracks(snapshot.tracks.size())
+          _progressState(new WaveformProgressState(snapshot.tracks.size()))
     {
     }
 
@@ -72,23 +85,41 @@ public:
 
     void publishProgress(uint32_t trackIndex, const std::vector<std::vector<float> > &channelPeaks)
     {
-        if (!_cancel || _cancel->load() || trackIndex >= _partialTracks.size())
+        if (!_cancel || _cancel->load() || !_progressState)
             return;
-        _partialTracks[trackIndex] = channelPeaks;
+
+        {
+            std::lock_guard<std::mutex> lock(_progressState->mutex);
+            if (trackIndex >= _progressState->tracks.size())
+                return;
+            _progressState->tracks[trackIndex] = channelPeaks;
+            if (_progressState->updateQueued)
+                return;
+            _progressState->updateQueued = true;
+        }
 
         QCoreApplication *application = QCoreApplication::instance();
         if (!application)
+        {
+            std::lock_guard<std::mutex> lock(_progressState->mutex);
+            _progressState->updateQueued = false;
             return;
+        }
 
         const std::string key = _key;
         const std::shared_ptr<std::atomic<bool> > cancel = _cancel;
         const QPointer<ADM_mwWaveform> target = _target;
-        const std::shared_ptr<std::vector<std::vector<std::vector<float> > > > partial(
-            new std::vector<std::vector<std::vector<float> > >(_partialTracks));
-        QMetaObject::invokeMethod(application, [key, cancel, target, partial]() {
+        const std::shared_ptr<WaveformProgressState> state = _progressState;
+        QMetaObject::invokeMethod(application, [key, cancel, target, state]() {
+            std::vector<std::vector<std::vector<float> > > latest;
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                latest = state->tracks;
+                state->updateQueued = false;
+            }
             if (!cancel || cancel->load() || key != activeKey || target.isNull())
                 return;
-            target->setChannelPeaks(*partial);
+            target->setChannelPeaks(latest);
         }, Qt::QueuedConnection);
     }
 
@@ -161,7 +192,7 @@ private:
     std::string _cachePath;
     std::shared_ptr<std::atomic<bool> > _cancel;
     QPointer<ADM_mwWaveform> _target;
-    std::vector<std::vector<std::vector<float> > > _partialTracks;
+    std::shared_ptr<WaveformProgressState> _progressState;
 };
 
 void start(void)

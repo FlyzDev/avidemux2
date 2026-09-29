@@ -18,8 +18,23 @@
 #include "DIA_coreToolkit.h"
 #include "DIA_coreUI_internal.h"
 #include "DIA_factoryStubs.h"
+#include "DIA_processing.h"
+#include "DIA_working.h"
 #include <stdarg.h>
 static CoreToolkitDescriptor *Toolkit=NULL;
+static thread_local bool suppressProgressForCurrentThread=false;
+
+class DIA_workingSilent : public DIA_workingBase
+{
+public:
+    DIA_workingSilent(const char *title) : DIA_workingBase(title) {}
+    uint8_t update(uint32_t percent) override { (void)percent; return 0; }
+    uint8_t update(uint32_t current, uint32_t total) override
+    {
+        (void)current; (void)total; return 0;
+    }
+    uint8_t isAlive(void) override { return 1; }
+};
 #define MAX_ALERT_SIZE 1024
 /**
  * 	\fn DIA_toolkitInit
@@ -188,6 +203,16 @@ uint8_t			GUI_isQuiet(void)
 	return Toolkit->isQuiet();	
 }
 
+void GUI_SuppressProgressForCurrentThread(bool suppress)
+{
+    suppressProgressForCurrentThread=suppress;
+}
+
+uint8_t GUI_isProgressSuppressedForCurrentThread(void)
+{
+    return suppressProgressForCurrentThread ? 1 : 0;
+}
+
 // Some obsolete functions ....
 
 uint8_t                 GUI_getIntegerValue(int *valye, int min, int max, const char *title)
@@ -244,6 +269,8 @@ uint8_t  DIA_GetFloatValue(float *value, float min, float max, const char *title
 */
 DIA_workingBase *createWorking(const char *title)
 {
+    if(suppressProgressForCurrentThread)
+        return new DIA_workingSilent(title);
     if(Toolkit->createWorking) return Toolkit->createWorking(title);
     return NULL;
 }
@@ -254,6 +281,8 @@ DIA_workingBase *createWorking(const char *title)
 */
 DIA_processingBase *createProcessing(const char *title,uint64_t totalToProcess)
 {
+    if(suppressProgressForCurrentThread)
+        return new DIA_processingBase(title,totalToProcess);
     if(Toolkit->createProcessing) return Toolkit->createProcessing(title,totalToProcess);
     return NULL;
 }
