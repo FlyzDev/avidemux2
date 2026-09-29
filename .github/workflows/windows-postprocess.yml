@@ -1,0 +1,96 @@
+name: Windows waveform portable postprocess
+
+on:
+  push:
+    branches:
+      - feat/waveform-ui
+
+jobs:
+  postprocess:
+    if: contains(github.event.head_commit.message, '[winpost]')
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Locate and download latest native package
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runs = gh run list --repo "${{ github.repository }}" --workflow "Windows native waveform package" --branch feat/waveform-ui --status success --limit 1 --json databaseId,headSha | ConvertFrom-Json
+          if (-not $runs) { throw "No successful native Windows package run found." }
+          $runId = $runs[0].databaseId
+          Write-Host "Using run $runId at $($runs[0].headSha)"
+          New-Item -ItemType Directory -Force incoming | Out-Null
+          gh run download $runId --repo "${{ github.repository }}" --name avidemux-waveform-windows-native-x64 --dir incoming
+      - name: Set up MSYS2 runtime source
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-ffmpeg
+            mingw-w64-ucrt-x86_64-SDL2
+            mingw-w64-ucrt-x86_64-libass
+            mingw-w64-ucrt-x86_64-libvpx
+            mingw-w64-ucrt-x86_64-aom
+            mingw-w64-ucrt-x86_64-opus
+            mingw-w64-ucrt-x86_64-fdk-aac
+            mingw-w64-ucrt-x86_64-lame
+            mingw-w64-ucrt-x86_64-libx264
+            mingw-w64-ucrt-x86_64-x265
+            mingw-w64-ucrt-x86_64-xvidcore
+
+      - name: Expand and resolve PE dependencies
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem incoming -Filter "avidemux-waveform-win64-native.zip" -Recurse | Select-Object -First 1
+          if (-not $zip) { throw "Native package zip is missing." }
+          Remove-Item runtime -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -Path $zip.FullName -DestinationPath runtime -Force
+          python -m pip install --disable-pip-version-check pefile
+          $ucrtBin = Join-Path $env:RUNNER_TEMP "msys64\ucrt64\bin"
+          python mxe_scan_deps.py runtime --sources $ucrtBin
+      - name: Smoke launch with multi-track fixture
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem runtime -Filter "avidemux*.exe" -Recurse | Where-Object { $_.Name -notmatch "cli" } | Select-Object -First 1
+          if (-not $exe) { throw "Avidemux GUI executable is missing." }
+          $fixture = Get-ChildItem incoming -Filter "windows-waveform-multitrack-test.mkv" -Recurse | Select-Object -First 1
+          if (-not $fixture) { throw "Multi-track fixture is missing." }
+          $stdout = Join-Path $env:RUNNER_TEMP "avidemux-waveform-stdout.txt"
+          $stderr = Join-Path $env:RUNNER_TEMP "avidemux-waveform-stderr.txt"
+          $args = '"' + $fixture.FullName + '"'
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList $args -WorkingDirectory $exe.DirectoryName -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          Start-Sleep -Seconds 8
+          if ($proc.HasExited -and $proc.ExitCode -ne 0) {
+            Get-Content $stdout -ErrorAction SilentlyContinue
+            Get-Content $stderr -ErrorAction SilentlyContinue
+            throw "Avidemux exited early with code $($proc.ExitCode)."
+          }
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          Get-Content $stdout -ErrorAction SilentlyContinue
+          Get-Content $stderr -ErrorAction SilentlyContinue
+      - name: Package portable Windows build
+        shell: pwsh
+        run: |
+          $fixture = Get-ChildItem incoming -Filter "windows-waveform-multitrack-test.mkv" -Recurse | Select-Object -First 1
+          Copy-Item $fixture.FullName runtime\windows-waveform-multitrack-test.mkv
+          Compress-Archive -Path runtime\* -DestinationPath avidemux-waveform-win64-portable.zip -Force
+          Get-Item avidemux-waveform-win64-portable.zip | Format-List Name,Length
+
+      - name: Upload portable Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: avidemux-waveform-windows-portable-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: avidemux-waveform-win64-portable.zip
