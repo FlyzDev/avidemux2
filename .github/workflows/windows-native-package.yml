@@ -52,7 +52,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set -euxo pipefail
-          export PATH="/ucrt64/bin:$PATH"
+          export PATH="/ucrt64/bin:/usr/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
           export QTDIR=/ucrt64
           ROOT="$PWD"
@@ -71,7 +71,7 @@ jobs:
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
             -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
             -DMINGW=TRUE
-          cmake --build buildNativeCore --parallel 2
+          cmake --build buildNativeCore --parallel 16
           cmake --install buildNativeCore
           cmake -S avidemux/qt4 -B buildNativeQt6 -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -85,7 +85,7 @@ jobs:
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
             -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
             -DMINGW=TRUE
-          cmake --build buildNativeQt6 --parallel 2
+          cmake --build buildNativeQt6 --parallel 16
           cmake --install buildNativeQt6
 
           echo "PREFIX CONTENTS"
@@ -95,7 +95,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set -euxo pipefail
-          export PATH="/ucrt64/bin:$PATH"
+          export PATH="/ucrt64/bin:/usr/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
           export QTDIR=/ucrt64
           ROOT="$PWD"
@@ -106,13 +106,14 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
             -DPLUGIN_UI=COMMON \
+            -DYASM_YASM=/usr/bin/yasm.exe \
             -DCMAKE_AR=/ucrt64/bin/ar.exe \
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
             -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
             -DMINGW=TRUE
-          cmake --build buildNativePluginsCommon --parallel 2
+          cmake --build buildNativePluginsCommon --parallel 16
           cmake --install buildNativePluginsCommon
           cmake -S avidemux_plugins -B buildNativePluginsQt6 -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -120,13 +121,14 @@ jobs:
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
             -DPLUGIN_UI=QT4 \
             -DENABLE_QT6=true \
+            -DYASM_YASM=/usr/bin/yasm.exe \
             -DCMAKE_AR=/ucrt64/bin/ar.exe \
             -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
             -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
             -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
             -DMINGW=TRUE
-          cmake --build buildNativePluginsQt6 --parallel 2
+          cmake --build buildNativePluginsQt6 --parallel 16
           cmake --install buildNativePluginsQt6
 
       - name: Find GUI executable
