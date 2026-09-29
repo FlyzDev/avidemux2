@@ -8,6 +8,12 @@
 #include "ADM_segment.h"
 
 #include <sys/stat.h>
+#include <vector>
+
+#ifdef _WIN32
+#include <windows.h>
+#include "ADM_win32.h"
+#endif
 
 
 static void ADM_waveformFileMetadata(const std::string &fileName, uint64_t *size, int64_t *modified)
@@ -21,9 +27,31 @@ static void ADM_waveformFileMetadata(const std::string &fileName, uint64_t *size
     if (size && portableSize >= 0)
         *size = static_cast<uint64_t>(portableSize);
 
+    if (!modified)
+        return;
+
+#ifdef _WIN32
+    const int wideLength = utf8StringToWideChar(fileName.c_str(), -1, NULL);
+    if (wideLength > 0)
+    {
+        std::vector<wchar_t> widePath(static_cast<size_t>(wideLength));
+        if (utf8StringToWideChar(fileName.c_str(), -1, &widePath[0]) > 0)
+        {
+            WIN32_FILE_ATTRIBUTE_DATA attributes;
+            if (GetFileAttributesExW(&widePath[0], GetFileExInfoStandard, &attributes))
+            {
+                ULARGE_INTEGER value;
+                value.LowPart = attributes.ftLastWriteTime.dwLowDateTime;
+                value.HighPart = attributes.ftLastWriteTime.dwHighDateTime;
+                *modified = static_cast<int64_t>(value.QuadPart);
+            }
+        }
+    }
+#else
     struct stat st;
-    if (modified && stat(fileName.c_str(), &st) == 0)
+    if (stat(fileName.c_str(), &st) == 0)
         *modified = static_cast<int64_t>(st.st_mtime);
+#endif
 }
 
 bool ADM_buildWaveformSnapshot(ADM_Composer *composer, ADM_WaveformSnapshot *snapshot)
