@@ -54,6 +54,14 @@ jobs:
           set -euxo pipefail
           export PATH="/ucrt64/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
+          mkdir -p "$PWD/.ci-mingw-bin"
+          for tool in ar nm ranlib strip objcopy objdump windres; do
+            if ! command -v "x86_64-w64-mingw32-$tool" >/dev/null 2>&1; then
+              printf '#!/usr/bin/env bash\nexec %s "$@"\n' "$tool" > "$PWD/.ci-mingw-bin/x86_64-w64-mingw32-$tool"
+              chmod +x "$PWD/.ci-mingw-bin/x86_64-w64-mingw32-$tool"
+            fi
+          done
+          export PATH="$PWD/.ci-mingw-bin:$PATH"
           export CROSS_PREFIX=x86_64-w64-mingw32
           export TOOLCHAIN_LOCATION=/ucrt64
           export CROSS_C_COMPILER=gcc
