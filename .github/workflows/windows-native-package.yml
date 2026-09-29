@@ -73,6 +73,12 @@ jobs:
           cmake -S avidemux_core -B buildNativeCore -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+            -DCMAKE_AR=/ucrt64/bin/ar.exe \
+            -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
+            -DCMAKE_NM=/ucrt64/bin/nm.exe \
+            -DCMAKE_STRIP=/ucrt64/bin/strip.exe \
+            -DCMAKE_OBJCOPY=/ucrt64/bin/objcopy.exe \
+            -DCMAKE_OBJDUMP=/ucrt64/bin/objdump.exe \
             -DCROSS=/ucrt64 \
             -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativeCore --parallel 2
@@ -82,6 +88,9 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
             -DENABLE_QT6=true \
+            -DCMAKE_AR=/ucrt64/bin/ar.exe \
+            -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
+            -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCROSS=/ucrt64 \
             -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativeQt6 --parallel 2
@@ -108,6 +117,9 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
             -DPLUGIN_UI=COMMON \
+            -DCMAKE_AR=/ucrt64/bin/ar.exe \
+            -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
+            -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCROSS=/ucrt64 \
             -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativePluginsCommon --parallel 2
@@ -118,6 +130,9 @@ jobs:
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
             -DPLUGIN_UI=QT4 \
             -DENABLE_QT6=true \
+            -DCMAKE_AR=/ucrt64/bin/ar.exe \
+            -DCMAKE_RANLIB=/ucrt64/bin/ranlib.exe \
+            -DCMAKE_NM=/ucrt64/bin/nm.exe \
             -DCROSS=/ucrt64 \
             -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativePluginsQt6 --parallel 2
