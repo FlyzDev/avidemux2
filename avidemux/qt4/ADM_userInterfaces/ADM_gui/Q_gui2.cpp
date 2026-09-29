@@ -12,6 +12,7 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <algorithm>
 #include <QColor>
 #include <QGraphicsView>
 #include <QKeyEvent>
@@ -119,6 +120,7 @@ static void setupMenus(void);
 static int shiftKeyHeld = 0;
 static int ctrlKeyHeld = 0;
 static ADM_mwNavSlider *slider = NULL;
+static ADM_mwWaveform *waveform = NULL;
 static int _upd_in_progres = 0;
 bool ADM_ve6_getEncoderInfo(int filter, const char **name, uint32_t *major, uint32_t *minor, uint32_t *patch);
 uint32_t ADM_ve6_getNbEncoders(void);
@@ -246,6 +248,14 @@ void MainWindow::comboChanged(int z)
  * \fn sliderValueChanged
  * @param u
  */
+void MainWindow::waveformSeekRequested(double ratio)
+{
+    if (!slider)
+        return;
+    ratio = std::max(0.0, std::min(1.0, ratio));
+    slider->setValue(static_cast<int>(ratio * slider->maximum()));
+}
+
 void MainWindow::sliderValueChanged(int u)
 {
 
@@ -752,6 +762,11 @@ MainWindow::MainWindow(const vector<IScriptEngine *> &scriptEngines) : _scriptEn
     connect(slider, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
     connect(slider, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
     connect(qslider, SIGNAL(sliderAction(int)), this, SLOT(sliderWheel(int)));
+
+    // Waveform overview. Peak extraction is fed asynchronously by the waveform indexer.
+    waveform = new ADM_mwWaveform(ui.dockWidgetContents_2);
+    ui.verticalLayout_8->insertWidget(1, waveform);
+    connect(waveform, SIGNAL(seekRequested(double)), this, SLOT(waveformSeekRequested(double)));
 
     connect(&dragTimer, SIGNAL(timeout()), this, SLOT(dragTimerTimeout()));
     connect(&busyTimer, SIGNAL(timeout()), this, SLOT(busyTimerTimeout()));
@@ -2862,6 +2877,7 @@ MainWindow::~MainWindow()
     renderDestroy(); // make sure render does not have back link to us
     delete thumbSlider;
     thumbSlider = NULL;
+    waveform = NULL; // owned by the Qt parent hierarchy
 }
 
 static const UI_FUNCTIONS_T UI_Hooks = {
@@ -3470,6 +3486,8 @@ admUITaskBarProgress *UI_getTaskBarProgress()
 */
 void UI_setCurrentTime(uint64_t curTime)
 {
+    if (waveform)
+        waveform->setPosition(curTime);
     char text[80];
     uint32_t mm, hh, ss, ms;
     uint32_t shorty = (uint32_t)(curTime / 1000);
@@ -3493,6 +3511,8 @@ void UI_setTotalTime(uint64_t curTime)
     sprintf(text, "/ %02d:%02d:%02d.%03d", hh, mm, ss, ms);
     WIDGET(totalTime)->setText(text);
     slider->setTotalDuration(curTime);
+    if (waveform)
+        waveform->setDuration(curTime);
 }
 /**
     \fn UI_setSegments
@@ -3532,6 +3552,8 @@ void UI_setMarkers(uint64_t a, uint64_t b)
     WIDGET(selectionDuration)->setText(duration);
 
     slider->setMarkers(absoluteA, absoluteB);
+    if (waveform)
+        waveform->setMarkers(absoluteA, absoluteB);
 }
 
 /**
@@ -3890,6 +3912,8 @@ void UI_displayZoomLevel(void)
 */
 void UI_setAudioTrackCount(int nb)
 {
+    if (waveform)
+        waveform->setTrackCount(nb);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
     QString text = QCoreApplication::translate("qgui2", " (%n track(s))", NULL, nb);
 #else

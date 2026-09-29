@@ -13,6 +13,7 @@
 #include <string>
 
 #include "ADM_mwNavSlider.h"
+#include "ADM_mwWaveform.h"
 #include "T_thumbSlider.h"
 #include "ui_gui2.h"
 #include "gui_action.hxx"
@@ -246,6 +247,7 @@ private slots:
     void sliderReleased(void);
     void sliderPressed(void);
     void sliderWheel(int way);
+    void waveformSeekRequested(double ratio);
 
     void dragTimerTimeout(void);
     void busyTimerTimeout(void);
