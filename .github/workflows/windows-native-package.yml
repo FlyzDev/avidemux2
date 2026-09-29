@@ -54,20 +54,28 @@ jobs:
           set -euxo pipefail
           export PATH="/ucrt64/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
+          export CROSS_PREFIX=x86_64-w64-mingw32
+          export TOOLCHAIN_LOCATION=/ucrt64
+          export CROSS_C_COMPILER=gcc
+          export CROSS_CXX_COMPILER=g++
           ROOT="$PWD"
           PREFIX="$ROOT/native-win-prefix"
           mkdir -p "$PREFIX"
 
           cmake -S avidemux_core -B buildNativeCore -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$PREFIX"
+            -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+            -DCROSS=/ucrt64 \
+            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativeCore --parallel 2
           cmake --install buildNativeCore
           cmake -S avidemux/qt4 -B buildNativeQt6 -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
-            -DENABLE_QT6=true
+            -DENABLE_QT6=true \
+            -DCROSS=/ucrt64 \
+            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativeQt6 --parallel 2
           cmake --install buildNativeQt6
 
@@ -80,6 +88,10 @@ jobs:
           set -euxo pipefail
           export PATH="/ucrt64/bin:$PATH"
           export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig"
+          export CROSS_PREFIX=x86_64-w64-mingw32
+          export TOOLCHAIN_LOCATION=/ucrt64
+          export CROSS_C_COMPILER=gcc
+          export CROSS_CXX_COMPILER=g++
           ROOT="$PWD"
           PREFIX="$ROOT/native-win-prefix"
 
@@ -87,7 +99,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
-            -DPLUGIN_UI=COMMON
+            -DPLUGIN_UI=COMMON \
+            -DCROSS=/ucrt64 \
+            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativePluginsCommon --parallel 2
           cmake --install buildNativePluginsCommon
           cmake -S avidemux_plugins -B buildNativePluginsQt6 -G Ninja \
@@ -95,7 +109,9 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
             -DAVIDEMUX_TOP_SOURCE_DIR="$ROOT" \
             -DPLUGIN_UI=QT4 \
-            -DENABLE_QT6=true
+            -DENABLE_QT6=true \
+            -DCROSS=/ucrt64 \
+            -DCMAKE_CROSS_PREFIX=x86_64-w64-mingw32
           cmake --build buildNativePluginsQt6 --parallel 2
           cmake --install buildNativePluginsQt6
 
