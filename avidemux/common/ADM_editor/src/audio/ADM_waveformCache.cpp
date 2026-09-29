@@ -2,10 +2,19 @@
 
 #include <cstdio>
 #include <cstring>
-#include <fstream>
 #include <iomanip>
 #include <limits>
 #include <sstream>
+
+// Avidemux core provides UTF-8-aware file operations on Windows. Keep the
+// cache module independent from generated core headers so its format tests can
+// still be built as a small standalone binary.
+extern FILE *ADM_fopen(const char *file, const char *mode);
+extern size_t ADM_fread(void *ptr, size_t size, size_t n, FILE *stream);
+extern size_t ADM_fwrite(const void *ptr, size_t size, size_t n, FILE *stream);
+extern int ADM_fclose(FILE *file);
+extern uint8_t ADM_eraseFile(const char *name);
+extern uint8_t ADM_renameFile(const char *source, const char *target);
 
 namespace
 {
@@ -49,44 +58,36 @@ public:
 };
 
 template <typename T>
-bool writePod(std::ofstream &out, const T &value)
+bool writePod(FILE *out, const T &value)
 {
-    out.write(reinterpret_cast<const char *>(&value), sizeof(value));
-    return out.good();
+    return out && ADM_fwrite(&value, sizeof(value), 1, out) == 1;
 }
 
 template <typename T>
-bool readPod(std::ifstream &in, T *value)
+bool readPod(FILE *in, T *value)
 {
-    if (!value)
-        return false;
-    in.read(reinterpret_cast<char *>(value), sizeof(*value));
-    return in.good();
+    return in && value && ADM_fread(value, sizeof(*value), 1, in) == 1;
 }
 
-bool writeString(std::ofstream &out, const std::string &value)
+bool writeString(FILE *out, const std::string &value)
 {
-    if (value.size() > kMaxKeyBytes)
+    if (!out || value.size() > kMaxKeyBytes)
         return false;
     const uint32_t size = static_cast<uint32_t>(value.size());
     if (!writePod(out, size))
         return false;
-    if (size)
-        out.write(value.data(), size);
-    return out.good();
+    return !size || ADM_fwrite(value.data(), 1, size, out) == size;
 }
 
-bool readString(std::ifstream &in, std::string *value)
+bool readString(FILE *in, std::string *value)
 {
-    if (!value)
+    if (!in || !value)
         return false;
     uint32_t size = 0;
     if (!readPod(in, &size) || size > kMaxKeyBytes)
         return false;
     value->assign(size, '\0');
-    if (size)
-        in.read(&(*value)[0], size);
-    return in.good();
+    return !size || ADM_fread(&(*value)[0], 1, size, in) == size;
 }
 }
 
@@ -150,59 +151,55 @@ bool ADM_writeWaveformCache(const std::string &path,
         return false;
 
     const std::string tempPath = path + ".tmp";
-    std::ofstream out(tempPath.c_str(), std::ios::binary | std::ios::trunc);
+    FILE *out = ADM_fopen(tempPath.c_str(), "wb");
     if (!out)
         return false;
 
-    out.write(kMagic, sizeof(kMagic));
-    if (!out.good() || !writePod(out, kFormatVersion) || !writeString(out, cacheKey) ||
-        !writePod(out, data.durationUs))
-    {
-        out.close();
-        std::remove(tempPath.c_str());
-        return false;
-    }
+    bool ok = ADM_fwrite(kMagic, 1, sizeof(kMagic), out) == sizeof(kMagic) &&
+              writePod(out, kFormatVersion) && writeString(out, cacheKey) &&
+              writePod(out, data.durationUs);
 
     const uint32_t trackCount = static_cast<uint32_t>(data.tracks.size());
-    if (!writePod(out, trackCount))
-        return false;
+    ok = ok && writePod(out, trackCount);
 
-    for (size_t track = 0; track < data.tracks.size(); ++track)
+    for (size_t track = 0; ok && track < data.tracks.size(); ++track)
     {
         if (data.tracks[track].size() > kMaxChannelsPerTrack)
-            return false;
+        {
+            ok = false;
+            break;
+        }
         const uint32_t channelCount = static_cast<uint32_t>(data.tracks[track].size());
-        if (!writePod(out, channelCount))
-            return false;
-
-        for (size_t channel = 0; channel < data.tracks[track].size(); ++channel)
+        ok = writePod(out, channelCount);
+        for (size_t channel = 0; ok && channel < data.tracks[track].size(); ++channel)
         {
             const std::vector<float> &peaks = data.tracks[track][channel];
             if (peaks.size() > kMaxBinsPerChannel)
-                return false;
+            {
+                ok = false;
+                break;
+            }
             const uint32_t peakCount = static_cast<uint32_t>(peaks.size());
-            if (!writePod(out, peakCount))
-                return false;
-            if (peakCount)
-                out.write(reinterpret_cast<const char *>(&peaks[0]), peakCount * sizeof(float));
-            if (!out.good())
-                return false;
+            ok = writePod(out, peakCount);
+            if (ok && peakCount)
+                ok = ADM_fwrite(&peaks[0], sizeof(float), peakCount, out) == peakCount;
         }
     }
 
-    out.flush();
-    const bool ok = out.good();
-    out.close();
+    if (ok)
+        ok = fflush(out) == 0;
+    ADM_fclose(out);
+
     if (!ok)
     {
-        std::remove(tempPath.c_str());
+        ADM_eraseFile(tempPath.c_str());
         return false;
     }
 
-    std::remove(path.c_str());
-    if (std::rename(tempPath.c_str(), path.c_str()) != 0)
+    ADM_eraseFile(path.c_str());
+    if (!ADM_renameFile(tempPath.c_str(), path.c_str()))
     {
-        std::remove(tempPath.c_str());
+        ADM_eraseFile(tempPath.c_str());
         return false;
     }
     return true;
@@ -216,57 +213,49 @@ bool ADM_readWaveformCache(const std::string &path,
         return false;
     data->clear();
 
-    std::ifstream in(path.c_str(), std::ios::binary);
+    FILE *in = ADM_fopen(path.c_str(), "rb");
     if (!in)
         return false;
 
+    bool ok = true;
     char magic[sizeof(kMagic)] = {};
-    in.read(magic, sizeof(magic));
-    if (!in.good() || std::memcmp(magic, kMagic, sizeof(kMagic)) != 0)
-        return false;
+    ok = ADM_fread(magic, 1, sizeof(magic), in) == sizeof(magic) &&
+         std::memcmp(magic, kMagic, sizeof(kMagic)) == 0;
 
     uint32_t version = 0;
     std::string cacheKey;
     uint32_t trackCount = 0;
-    if (!readPod(in, &version) || version != kFormatVersion ||
-        !readString(in, &cacheKey) || cacheKey != expectedCacheKey ||
-        !readPod(in, &data->durationUs) ||
-        !readPod(in, &trackCount) || trackCount > kMaxTracks)
-    {
-        data->clear();
-        return false;
-    }
+    ok = ok && readPod(in, &version) && version == kFormatVersion &&
+         readString(in, &cacheKey) && cacheKey == expectedCacheKey &&
+         readPod(in, &data->durationUs) &&
+         readPod(in, &trackCount) && trackCount <= kMaxTracks;
 
-    data->tracks.resize(trackCount);
-    for (uint32_t track = 0; track < trackCount; ++track)
+    if (ok)
+        data->tracks.resize(trackCount);
+
+    for (uint32_t track = 0; ok && track < trackCount; ++track)
     {
         uint32_t channelCount = 0;
-        if (!readPod(in, &channelCount) || channelCount > kMaxChannelsPerTrack)
-        {
-            data->clear();
-            return false;
-        }
+        ok = readPod(in, &channelCount) && channelCount <= kMaxChannelsPerTrack;
+        if (!ok)
+            break;
         data->tracks[track].resize(channelCount);
 
-        for (uint32_t channel = 0; channel < channelCount; ++channel)
+        for (uint32_t channel = 0; ok && channel < channelCount; ++channel)
         {
             uint32_t peakCount = 0;
-            if (!readPod(in, &peakCount) || peakCount > kMaxBinsPerChannel)
-            {
-                data->clear();
-                return false;
-            }
+            ok = readPod(in, &peakCount) && peakCount <= kMaxBinsPerChannel;
+            if (!ok)
+                break;
             std::vector<float> &peaks = data->tracks[track][channel];
             peaks.resize(peakCount);
             if (peakCount)
-                in.read(reinterpret_cast<char *>(&peaks[0]), peakCount * sizeof(float));
-            if (!in.good())
-            {
-                data->clear();
-                return false;
-            }
+                ok = ADM_fread(&peaks[0], sizeof(float), peakCount, in) == peakCount;
         }
     }
 
-    return true;
+    ADM_fclose(in);
+    if (!ok)
+        data->clear();
+    return ok;
 }

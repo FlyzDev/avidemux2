@@ -4,6 +4,14 @@
 #include <cstdio>
 #include <iostream>
 
+// Standalone test shims for the Avidemux core file API.
+FILE *ADM_fopen(const char *file, const char *mode) { return std::fopen(file, mode); }
+size_t ADM_fread(void *ptr, size_t size, size_t n, FILE *stream) { return std::fread(ptr, size, n, stream); }
+size_t ADM_fwrite(const void *ptr, size_t size, size_t n, FILE *stream) { return std::fwrite(ptr, size, n, stream); }
+int ADM_fclose(FILE *file) { return std::fclose(file); }
+uint8_t ADM_eraseFile(const char *name) { return std::remove(name) == 0; }
+uint8_t ADM_renameFile(const char *source, const char *target) { return std::rename(source, target) == 0; }
+
 int main()
 {
     ADM_WaveformSnapshot snapshot;
