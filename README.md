@@ -1,92 +1,92 @@
-# Avidemux 
+# Avidemux Waveform
 
-Avidemux is a simple cross-platform video editor for Linux, Windows and macOS.
+A community fork of [Avidemux](https://github.com/mean00/avidemux2) that adds a fast, cached audio waveform to the classic Avidemux editing workflow.
 
-# Download executables
+[![Latest release](https://img.shields.io/github/v/release/FlyzDev/avidemux2?display_name=tag&sort=semver)](https://github.com/FlyzDev/avidemux2/releases/latest)
+[![Windows build](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml/badge.svg?branch=master)](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml)
+[![macOS ARM64 build](https://github.com/FlyzDev/avidemux2/actions/workflows/macos-arm64-waveform-build.yml/badge.svg?branch=master)](https://github.com/FlyzDev/avidemux2/actions/workflows/macos-arm64-waveform-build.yml)
 
-[Latest release](https://github.com/mean00/avidemux2/releases/latest)
+## Why this fork exists
 
-[Nightly builds](https://www.avidemux.org/nightly/)
+Avidemux is excellent for quick cuts and stream-copy exports, but the stock timeline does not show audio. This fork keeps the lightweight Avidemux workflow and adds the waveform information needed to find speech, silence, beats and cut points quickly.
 
-# Build from source
+The waveform is generated in the background. You can continue seeking and working while it fills in, and cached peak data is reused the next time the same edit state is opened.
 
-**Avidemux build directory must be located on a case-sensitive file system.**
+## Download
 
-Out-of-tree build is supported. If build is conducted in-tree, the source
-directory has to be located on a case-sensitive file system either.
+| Platform | Build | Download |
+| --- | --- | --- |
+| Windows 10/11 x64 | Portable | [Latest release](https://github.com/FlyzDev/avidemux2/releases/latest) |
+| macOS Apple Silicon | DMG / app zip | [Latest release](https://github.com/FlyzDev/avidemux2/releases/latest) |
+| Source | Git | [Releases](https://github.com/FlyzDev/avidemux2/releases) |
 
-To get Avidemux source code from the main repository and the translations,
-run the following command:
+Intel macOS and Linux binaries are not published yet. The source remains cross-platform.
+
+## Waveform features
+
+- Combined overview by default.
+- Right-click the waveform for separate audio tracks or separate channels.
+- Progressive background waveform generation; the UI remains usable while indexing.
+- Low-priority waveform worker so playback and seeking keep priority.
+- Cached peak data for fast reopen.
+- Multi-track and multi-channel audio support.
+- Playhead plus A/B selection markers drawn directly over the waveform.
+- Left-click waveform seeking.
+- Background demux/index work is prevented from opening modal progress UI, avoiding cross-thread GUI deadlocks.
+- Existing Avidemux copy-mode editing and export behavior is preserved.
+
+## Install
+
+### Windows
+
+Download the Windows x64 portable zip from the latest release, extract it to a normal folder, then run `avidemux.exe`.
+
+No installer is required. Keep the DLLs and plugin folders next to the executable.
+
+### macOS Apple Silicon
+
+Download the Apple Silicon DMG from the latest release and drag the app to Applications. The community build is ad-hoc signed but is not Apple-notarized, so macOS may require **Right click → Open** the first time.
+
+The current macOS binary targets Apple Silicon (M1/M2/M3/M4 and newer ARM64 Macs).
+
+## Using the waveform
+
+Open a video normally. The waveform area appears under the seek bar and starts filling in shortly after the file becomes usable. You do not need to wait for waveform generation before seeking or editing.
+
+Right-click the waveform to switch between:
+
+- **Master / combined waveform** — compact overview of active audio tracks.
+- **Separate audio tracks** — one lane per audio track.
+- **Separate channels** — individual channel lanes for each track.
+
+For long or multi-track files, the first pass can take a little time. The result is cached and reused when the source/timeline state matches.
+
+## Status
+
+This fork is currently an experimental preview. The Windows build is tested with a generated multi-track fixture and a portable dependency scan. The macOS build is produced on Apple Silicon and smoke-tested before publishing.
+
+If you hit a hang or crash, open an issue with the source container/codec details and, when available, the Windows WER/ProcDump report or macOS crash report.
+
+## Build from source
+
+The waveform work lives in this repository on top of upstream Avidemux. Avidemux build directories must be on a case-sensitive filesystem on macOS.
+
+### macOS Apple Silicon
+
+Install the normal Avidemux build dependencies with Homebrew, then run:
+
+```bash
+bash bootStrapMacOS_Monterey.arm64.sh --with-internal-libmp4v2
 ```
-git clone --recursive https://github.com/mean00/avidemux2.git && cd avidemux2
-```
 
+### Windows
 
-## Build on Linux
+The repository contains GitHub Actions workflows for a native MSYS2 UCRT64 build and portable package validation. See `.github/workflows/windows-native-package.yml` and `.github/workflows/windows-postprocess.yml`.
 
-Install build dependencies:
+For the full upstream build documentation and supported platforms, see the [official Avidemux repository](https://github.com/mean00/avidemux2).
 
-> Debian / Ubuntu and variants:
-```
-bash createDebFromSourceUbuntu.bash --deps-only
-```
-> Fedora:
-```
-bash createRpmFromSourceFedora.bash --deps-only
-```
-Build Avidemux:
-```
-bash bootStrap.bash
-```
-> Alternatively building on Qt5 instead of Qt6:
-```
-bash bootStrap.bash --enable-qt5
-```
+## Upstream and license
 
-The compiled output will be in the `install` subdirectory of the build directory.
+This is an unofficial community fork, not an official Avidemux release. Avidemux and the overwhelming majority of this codebase are maintained by the upstream Avidemux project and contributors.
 
-Avidemux can be run without installation by means of a start script derived
-from the template `run_avidemux_template_qt6.sh`.
-
-1. Make a copy of this script file.
-2. If Avidemux has been built in a different location than `${HOME}/avidemux2`,
-edit the value of variable `BUILDTOP` to point to the *actual* build directory.
-Adjust the value of variable `PREFIX` if necessary.
-3. Copy the script to a directory listed in `$PATH` and make it executable.
-
-
-## Build on macOS
-
-Install [Homebrew](https://github.com/Homebrew/brew)
-
-Install required build dependencies:
-```
-brew install cmake pkg-config nasm yasm qt xvid x264 x265 libvpx aom opus fdk-aac lame libass mp4v2 a52dec
-```
-
-Build Avidemux (Apple Silicon):  
-It may be necessary to install Xcode, not just Command Line Tools, else creation of app bundle fails.
-```
-bash bootStrapMacOS_Monterey.arm64.sh
-```
-
-Build Avidemux (Intel):
-```
-export MACOSX_DEPLOYMENT_TARGET=$(xcrun --sdk macosx --show-sdk-version)
-bash bootStrapOsx_Catalina.bash --enable-qt6
-```
-On both Apple platforms, the disk image should be generated in the `installer`
-subdirectory of `avidemux2`.
-
-Post-installation (Apple Silicon):  
-Only if Avidemux has been built on a different Apple Silicon system,
-execute the following command to replace ad-hoc signatures of the binaries:
-```
-sh avidemux/osxInstaller/macos-adhoc-sign-installed-app.sh
-```
-When Avidemux app has been installed to a non-default location, adjust the value
-of `BUNDLE_CONTENT` variable in the aforementioned file accordingly.
-
-## Build for Windows
-
-[Cross-compiling Avidemux on Linux for Windows](https://github.com/mean00/avidemux2/blob/master/cross-compiling.txt)
+The project remains under the licenses used by upstream Avidemux. See the repository license files and source headers for details.
