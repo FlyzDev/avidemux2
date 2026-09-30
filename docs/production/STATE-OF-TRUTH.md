@@ -133,7 +133,7 @@ Apple Silicon packaging is green and release-validated.
 - The full application bundle is ad-hoc signed and passes `codesign --verify --deep --strict`.
 - `hdiutil verify` passes.
 - The final DMG was mounted and the contained app was launched through LaunchServices (`open -na`), matching Finder-style launch behavior.
-- The published Preview 1 macOS assets were replaced with this corrected, validated build.
+- The published macOS assets were replaced with this corrected, validated build.
 
 Mac mini runner / workspace:
 
@@ -143,12 +143,12 @@ Mac mini runner / workspace:
 
 ## GitHub / public release status
 
-Preview 1 is published.
+The first public release is published.
 
-- Release: `Avidemux Waveform 2.8.2 – Preview 1`
+- Release: `Avidemux Waveform + Markers 2.8.2`
 - Tag: `v2.8.2-waveform.1`
 - Tag target: `c987bb505aad24f1b24c4ffab78c3921f3aae827`
-- Published as GitHub prerelease on 2026-09-30.
+- Published as a normal GitHub release on 2026-09-30.
 - Windows asset: `Avidemux-Waveform-Windows-x64-Portable.zip`
 - macOS assets: `Avidemux-Waveform-macOS-Apple-Silicon.dmg` and `Avidemux-Waveform-macOS-Apple-Silicon.app.zip` (final macOS 14+ LaunchServices-validated replacements)
 - Checksum manifest: `SHA256SUMS.txt`
@@ -156,7 +156,7 @@ Preview 1 is published.
 
 ## Next order of work
 
-1. Collect Preview 1 user feedback and crash/hang reports.
+1. Collect user feedback and crash/hang reports.
 2. Fix any release-blocking regressions before expanding marker/waveform scope.
-3. Keep Windows portable and macOS ARM64 packaging workflows green for subsequent previews.
-4. Consider Intel macOS / Linux binaries only after the current Windows + Apple Silicon preview stabilizes.
+3. Keep Windows portable and macOS ARM64 packaging workflows green for subsequent releases.
+4. Consider Intel macOS / Linux binaries after the current Windows + Apple Silicon release stabilizes.
