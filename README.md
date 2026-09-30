@@ -34,6 +34,9 @@ Intel macOS and Linux binaries are not published yet. The source remains cross-p
 - Left-click waveform seeking.
 - Background demux/index work is prevented from opening modal progress UI, avoiding cross-thread GUI deadlocks.
 - Existing Avidemux copy-mode editing and export behavior is preserved.
+- Timeline marker import from Premiere / XMEML XML, CSV and JSON.
+- Imported markers are drawn on both the seek bar and waveform.
+- Dedicated previous / next marker navigation buttons and keyboard shortcuts.
 
 ## Install
 
@@ -60,6 +63,16 @@ Right-click the waveform to switch between:
 - **Separate channels** — individual channel lanes for each track.
 
 For long or multi-track files, the first pass can take a little time. The result is cached and reused when the source/timeline state matches.
+
+## Timeline markers
+
+Use the **M+** button beside the navigation controls to import timeline markers. The importer accepts:
+
+- Premiere / Final Cut Pro style XMEML XML sequence markers (`<marker><name>…</name><in>frame</in>`), using the sequence timebase / NTSC flag.
+- CSV files including common columns such as `Marker Name`, `In`, `Time`, `Timecode`, `Frame`, `Seconds`, `Description` and `FPS`.
+- JSON as either an array of marker objects or `{ "fps": 60, "markers": [...] }`. Marker time can be supplied as `timeUs`, `timeMs`, `seconds`, `frame`, `in`, `time`, or `timecode`.
+
+Imported markers are session-local and do not replace Avidemux's A/B selection markers. They appear as marker lines on the seek bar and waveform. Use **M◀ / M▶** or **Alt+Left / Alt+Right** to jump to the previous or next imported marker.
 
 ## Status
 

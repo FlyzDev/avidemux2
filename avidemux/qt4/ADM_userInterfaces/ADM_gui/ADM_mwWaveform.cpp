@@ -90,6 +90,18 @@ void ADM_mwWaveform::setGenerating(bool active)
     update();
 }
 
+void ADM_mwWaveform::setTimelineMarkers(const std::vector<ADM_TimelineMarker> &markers)
+{
+    timelineMarkers = markers;
+    update();
+}
+
+void ADM_mwWaveform::clearTimelineMarkers(void)
+{
+    timelineMarkers.clear();
+    update();
+}
+
 void ADM_mwWaveform::setDisplayMode(DisplayMode newMode)
 {
     if (newMode == DisplayTracks && trackCount < 2)
@@ -284,6 +296,53 @@ void ADM_mwWaveform::drawEmptyTrack(QPainter &painter, const QRect &rect, const 
     drawLaneLabel(painter, rect, label);
 }
 
+void ADM_mwWaveform::drawTimelineMarkers(QPainter &painter) const
+{
+    if (!totalDuration || timelineMarkers.empty())
+        return;
+
+    QColor markerColor = palette().color(QPalette::Link);
+    markerColor.setAlpha(220);
+    painter.setPen(QPen(markerColor, 1, Qt::DashLine));
+    painter.setBrush(markerColor);
+
+    const QFontMetrics metrics = painter.fontMetrics();
+    int lastLabelRight = -10000;
+    for (size_t i = 0; i < timelineMarkers.size(); ++i)
+    {
+        const ADM_TimelineMarker &marker = timelineMarkers[i];
+        if (marker.timeUs > totalDuration)
+            continue;
+        const int x = timeToX(marker.timeUs);
+        painter.drawLine(x, 0, x, height() - 1);
+
+        QPolygon flag;
+        flag << QPoint(x, 0) << QPoint(std::min(width() - 1, x + 7), 0) << QPoint(x, 7);
+        painter.drawPolygon(flag);
+
+        if (marker.name.isEmpty())
+            continue;
+#if QT_VERSION < QT_VERSION_CHECK(5, 11, 0)
+        const int textWidth = metrics.width(marker.name);
+#else
+        const int textWidth = metrics.horizontalAdvance(marker.name);
+#endif
+        int left = x + 4;
+        if (left + textWidth + 8 > width())
+            left = std::max(0, x - textWidth - 12);
+        if (left <= lastLabelRight + 6)
+            continue;
+        QRect labelRect(left, 2, textWidth + 8, metrics.height() + 2);
+        QColor background = palette().color(QPalette::Base);
+        background.setAlpha(215);
+        painter.fillRect(labelRect, background);
+        painter.setPen(markerColor);
+        painter.drawText(labelRect.adjusted(4, 0, -4, 0), Qt::AlignLeft | Qt::AlignVCenter, marker.name);
+        lastLabelRight = labelRect.right();
+        painter.setPen(QPen(markerColor, 1, Qt::DashLine));
+    }
+}
+
 void ADM_mwWaveform::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
@@ -386,6 +445,8 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
         painter.setPen(palette().color(QPalette::Text));
         painter.drawText(statusRect, Qt::AlignCenter, status);
     }
+
+    drawTimelineMarkers(painter);
 
     if (totalDuration)
     {

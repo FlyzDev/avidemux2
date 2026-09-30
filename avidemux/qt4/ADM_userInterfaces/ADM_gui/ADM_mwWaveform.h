@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <stdint.h>
 #include <vector>
+#include "ADM_timelineMarker.h"
 
 class QPainter;
 class QMouseEvent;
@@ -29,6 +30,8 @@ public:
     void setDisplayMode(DisplayMode mode);
     DisplayMode displayMode(void) const { return mode; }
     void setGenerating(bool active);
+    void setTimelineMarkers(const std::vector<ADM_TimelineMarker> &markers);
+    void clearTimelineMarkers(void);
 
     void clearPeaks(void);
     void setCombinedPeaks(const std::vector<float> &peaks);
@@ -55,6 +58,7 @@ private:
     int trackCount;
     DisplayMode mode;
     bool generating;
+    std::vector<ADM_TimelineMarker> timelineMarkers;
     std::vector<float> combinedPeaks;
     std::vector<std::vector<float> > trackPeaks;
     std::vector<std::vector<std::vector<float> > > channelPeaks;
@@ -65,6 +69,7 @@ private:
     void drawPeakVector(QPainter &painter, const QRect &rect, const std::vector<float> &peaks) const;
     void drawLaneLabel(QPainter &painter, const QRect &rect, const QString &label) const;
     void drawEmptyTrack(QPainter &painter, const QRect &rect, const QString &label) const;
+    void drawTimelineMarkers(QPainter &painter) const;
     void rebuildCombinedPeaks(void);
     void rebuildTrackPeaksFromChannels(void);
 };

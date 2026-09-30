@@ -14,6 +14,8 @@ Custom slider
 
 #pragma once
 #include "ADM_toolkitQt.h"
+#include "ADM_timelineMarker.h"
+#include <vector>
 
 /**
     \class ADM_mwNavSlider
@@ -24,8 +26,10 @@ class ADM_mwNavSlider : public ADM_flyNavSlider
 protected:
     uint64_t * segments;
     uint32_t numOfSegments;
+    std::vector<ADM_TimelineMarker> timelineMarkers;
 
     void drawCutPoints(void);
+    void drawTimelineMarkers(void);
     void paintEvent(QPaintEvent *event);
     void wheelEvent(QWheelEvent *e);
 
@@ -38,6 +42,8 @@ public:
     void setMarkers(uint64_t frameIndexA, uint64_t frameIndexB);
     void setTotalDuration(uint64_t duration);
     void setSegments(uint32_t numOfSegs, uint64_t * segPts);
+    void setTimelineMarkers(const std::vector<ADM_TimelineMarker> &markers);
+    void clearTimelineMarkers(void);
 signals:
     void sliderAction(int value);
 };

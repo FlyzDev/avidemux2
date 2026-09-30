@@ -14,6 +14,7 @@
 
 #include "ADM_mwNavSlider.h"
 #include "ADM_mwWaveform.h"
+#include "ADM_timelineMarker.h"
 #include "T_thumbSlider.h"
 #include "ui_gui2.h"
 #include "gui_action.hxx"
@@ -161,6 +162,10 @@ protected:
     std::vector<QMenu *> subMenus;
 #endif
     ThumbSlider *thumbSlider;
+    QToolButton *markerImportButton = NULL;
+    QToolButton *previousMarkerButton = NULL;
+    QToolButton *nextMarkerButton = NULL;
+    std::vector<ADM_TimelineMarker> importedTimelineMarkers;
 
     bool     refreshCapEnabled;
     uint32_t refreshCapValue;
@@ -209,6 +214,8 @@ protected:
     void changeEvent(QEvent* event);
 
     void setTimeDisplaySize(void);
+    void applyTimelineMarkers(const std::vector<ADM_TimelineMarker> &markers);
+    void seekTimelineMarker(bool forward);
 
     /* Zoom control */
     bool adjustZoom(int width, int height);
@@ -248,6 +255,9 @@ private slots:
     void sliderPressed(void);
     void sliderWheel(int way);
     void waveformSeekRequested(double ratio);
+    void importTimelineMarkers(void);
+    void previousTimelineMarker(void);
+    void nextTimelineMarker(void);
 
     void dragTimerTimeout(void);
     void busyTimerTimeout(void);
@@ -291,6 +301,7 @@ public slots:
     void updateAvailableSlot(int version, std::string date, std::string url);
     void setRefreshCap(void);
     void setMenuItemsEnabledState(void);
+    void clearTimelineMarkers(void);
 
     void volumeChange(int u);
     void audioToggled(bool checked);

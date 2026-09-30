@@ -32,11 +32,13 @@ jobs:
             fi
             hdiutil attach "$IMAGE" -nobrowse
           fi
-          cd "$GITHUB_WORKSPACE"
-          git worktree remove --force "$VOLUME/src" 2>/dev/null || true
           rm -rf "$VOLUME/src"
-          git worktree add --detach "$VOLUME/src" "$GITHUB_SHA"
-          git -C "$VOLUME/src" submodule update --init --recursive
+          mkdir -p "$VOLUME/src"
+          # actions/checkout has already materialized recursive submodules. Copy
+          # that complete tree onto the case-sensitive APFS volume instead of
+          # cloning submodules a second time over the network.
+          rsync -a --delete --exclude='.git' "$GITHUB_WORKSPACE/" "$VOLUME/src/"
+          test -f "$VOLUME/src/avidemux/qt4/i18n/CMakeLists.txt"
 
       - name: Build self-contained Avidemux ARM64 app and DMG
         shell: bash
@@ -128,5 +130,4 @@ jobs:
         shell: bash
         run: |
           VOLUME="/Volumes/AvidemuxWaveformCI"
-          cd "$GITHUB_WORKSPACE"
-          git worktree remove --force "$VOLUME/src" 2>/dev/null || true
+          rm -rf "$VOLUME/src" 2>/dev/null || true

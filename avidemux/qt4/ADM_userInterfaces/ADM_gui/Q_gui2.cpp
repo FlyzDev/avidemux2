@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <QColor>
+#include <QFileDialog>
 #include <QGraphicsView>
 #include <QKeyEvent>
 #include <QMessageBox>
@@ -115,6 +116,7 @@ extern void destroyTranslator(void);
 extern ADM_RENDER_TYPE UI_getPreferredRender(void);
 extern int A_openVideo(const char *name);
 extern int A_appendVideo(const char *name);
+extern bool GUI_GoToTime(uint64_t time);
 
 int SliderIsShifted = 0;
 static void setupMenus(void);
@@ -255,6 +257,120 @@ void MainWindow::waveformSeekRequested(double ratio)
         return;
     ratio = std::max(0.0, std::min(1.0, ratio));
     slider->setValue(static_cast<int>(ratio * slider->maximum()));
+}
+
+void MainWindow::applyTimelineMarkers(const std::vector<ADM_TimelineMarker> &markers)
+{
+    importedTimelineMarkers = markers;
+    if (slider)
+        slider->setTimelineMarkers(importedTimelineMarkers);
+    if (waveform)
+        waveform->setTimelineMarkers(importedTimelineMarkers);
+    const bool haveMarkers = !importedTimelineMarkers.empty();
+    if (previousMarkerButton)
+        previousMarkerButton->setEnabled(haveMarkers);
+    if (nextMarkerButton)
+        nextMarkerButton->setEnabled(haveMarkers);
+}
+
+void MainWindow::clearTimelineMarkers(void)
+{
+    importedTimelineMarkers.clear();
+    if (slider)
+        slider->clearTimelineMarkers();
+    if (waveform)
+        waveform->clearTimelineMarkers();
+    if (previousMarkerButton)
+        previousMarkerButton->setEnabled(false);
+    if (nextMarkerButton)
+        nextMarkerButton->setEnabled(false);
+}
+
+void MainWindow::importTimelineMarkers(void)
+{
+    if (!video_body || !avifileinfo)
+    {
+        QMessageBox::information(this, tr("Import markers"), tr("Open a video before importing timeline markers."));
+        return;
+    }
+
+    const QString fileName = QFileDialog::getOpenFileName(
+        this,
+        tr("Import timeline markers"),
+        QString(),
+        tr("Marker files (*.xml *.csv *.json);;Premiere / XMEML (*.xml);;CSV (*.csv);;JSON (*.json);;All files (*)"));
+    if (fileName.isEmpty())
+        return;
+
+    const double fps = avifileinfo->fps1000 > 0 ? avifileinfo->fps1000 / 1000.0 : 25.0;
+    std::vector<ADM_TimelineMarker> markers;
+    QString error;
+    if (!ADM_loadTimelineMarkers(fileName, fps, &markers, &error))
+    {
+        QMessageBox::warning(this, tr("Import markers"), error.isEmpty() ? tr("No markers were found in this file.") : error);
+        return;
+    }
+
+    const uint64_t duration = video_body->getVideoDuration();
+    markers.erase(std::remove_if(markers.begin(), markers.end(), [duration](const ADM_TimelineMarker &marker) {
+        return duration && marker.timeUs > duration;
+    }), markers.end());
+    if (markers.empty())
+    {
+        QMessageBox::warning(this, tr("Import markers"), tr("All markers are outside the current timeline."));
+        return;
+    }
+
+    applyTimelineMarkers(markers);
+    notifyStatusBar(0, QT_TRANSLATE_NOOP("qgui2", "Markers"),
+                    tr("Imported %1 timeline marker(s)").arg(markers.size()).toUtf8().constData(), 3500, false);
+}
+
+void MainWindow::seekTimelineMarker(bool forward)
+{
+    if (!video_body || importedTimelineMarkers.empty())
+        return;
+
+    const uint64_t current = video_body->getCurrentFramePts();
+    const uint64_t epsilon = 50000; // 50 ms: don't select the marker we are already sitting on.
+    uint64_t target = ADM_NO_PTS;
+
+    if (forward)
+    {
+        for (size_t i = 0; i < importedTimelineMarkers.size(); ++i)
+        {
+            if (importedTimelineMarkers[i].timeUs > current + epsilon)
+            {
+                target = importedTimelineMarkers[i].timeUs;
+                break;
+            }
+        }
+    }
+    else
+    {
+        for (std::vector<ADM_TimelineMarker>::const_reverse_iterator it = importedTimelineMarkers.rbegin();
+             it != importedTimelineMarkers.rend(); ++it)
+        {
+            if (it->timeUs + epsilon < current)
+            {
+                target = it->timeUs;
+                break;
+            }
+        }
+    }
+
+    if (target != ADM_NO_PTS)
+        GUI_GoToTime(target);
+}
+
+void MainWindow::previousTimelineMarker(void)
+{
+    seekTimelineMarker(false);
+}
+
+void MainWindow::nextTimelineMarker(void)
+{
+    seekTimelineMarker(true);
 }
 
 void MainWindow::sliderValueChanged(int u)
@@ -707,6 +823,9 @@ MainWindow::MainWindow(const vector<IScriptEngine *> &scriptEngines) : _scriptEn
     navigateWhilePlayingState = 0;
     recentFiles = NULL;
     recentProjects = NULL;
+    markerImportButton = NULL;
+    previousMarkerButton = NULL;
+    nextMarkerButton = NULL;
     actionLock = 0;
     busyCntr = 0;
     busyTimer.setSingleShot(true);
@@ -778,6 +897,39 @@ MainWindow::MainWindow(const vector<IScriptEngine *> &scriptEngines) : _scriptEn
     resizeNavigationForWaveform(waveform->minimumHeight());
     connect(waveform, &ADM_mwWaveform::preferredHeightChanged, this, resizeNavigationForWaveform);
     connect(waveform, SIGNAL(seekRequested(double)), this, SLOT(waveformSeekRequested(double)));
+
+    // Imported timeline markers (Premiere XML / CSV / JSON). These are separate
+    // from A/B selection markers and are session-local navigation aids.
+    markerImportButton = new QToolButton(ui.dockWidgetContents_2);
+    markerImportButton->setText(QStringLiteral("M+"));
+    markerImportButton->setToolTip(tr("Import timeline markers (XML / CSV / JSON) [Ctrl+Shift+M]"));
+    markerImportButton->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+M")));
+    markerImportButton->setAutoRaise(true);
+    markerImportButton->setMinimumWidth(32);
+
+    previousMarkerButton = new QToolButton(ui.dockWidgetContents_2);
+    previousMarkerButton->setText(QString::fromUtf8("◀M"));
+    previousMarkerButton->setToolTip(tr("Go to previous imported marker [Alt+Left]"));
+    previousMarkerButton->setShortcut(QKeySequence(QStringLiteral("Alt+Left")));
+    previousMarkerButton->setAutoRaise(true);
+    previousMarkerButton->setMinimumWidth(36);
+    previousMarkerButton->setEnabled(false);
+
+    nextMarkerButton = new QToolButton(ui.dockWidgetContents_2);
+    nextMarkerButton->setText(QString::fromUtf8("M▶"));
+    nextMarkerButton->setToolTip(tr("Go to next imported marker [Alt+Right]"));
+    nextMarkerButton->setShortcut(QKeySequence(QStringLiteral("Alt+Right")));
+    nextMarkerButton->setAutoRaise(true);
+    nextMarkerButton->setMinimumWidth(36);
+    nextMarkerButton->setEnabled(false);
+
+    const int markerButtonInsert = std::max(0, ui.navButtonsLayout->count() - 1);
+    ui.navButtonsLayout->insertWidget(markerButtonInsert, markerImportButton);
+    ui.navButtonsLayout->insertWidget(markerButtonInsert + 1, previousMarkerButton);
+    ui.navButtonsLayout->insertWidget(markerButtonInsert + 2, nextMarkerButton);
+    connect(markerImportButton, SIGNAL(clicked(bool)), this, SLOT(importTimelineMarkers()));
+    connect(previousMarkerButton, SIGNAL(clicked(bool)), this, SLOT(previousTimelineMarker()));
+    connect(nextMarkerButton, SIGNAL(clicked(bool)), this, SLOT(nextTimelineMarker()));
 
     connect(&dragTimer, SIGNAL(timeout()), this, SLOT(dragTimerTimeout()));
     connect(&busyTimer, SIGNAL(timeout()), this, SLOT(busyTimerTimeout()));
@@ -3411,6 +3563,14 @@ void UI_setTitle(const char *name)
 {
     char *title;
     const char *defaultTitle = "Avidemux";
+    static QString markerOwnerTitle;
+    const QString incomingTitle = name ? QString::fromUtf8(name) : QString();
+    if (incomingTitle != markerOwnerTitle)
+    {
+        if (MainWindow::mainWindowSingleton)
+            MainWindow::mainWindowSingleton->clearTimelineMarkers();
+        markerOwnerTitle = incomingTitle;
+    }
 
     if (name && (*name))
     {

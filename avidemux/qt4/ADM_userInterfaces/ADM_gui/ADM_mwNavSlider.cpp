@@ -12,9 +12,11 @@ Custom slider
 *                                                                         *
 ***************************************************************************/
 #include <stdio.h>
+#include <algorithm>
 #include <stdlib.h>
 #include "ADM_inttype.h"
 #include <QPainter>
+#include <QPolygon>
 #include <QSlider>
 #include <QWheelEvent>
 #include "ADM_mwNavSlider.h"
@@ -68,6 +70,33 @@ void ADM_mwNavSlider::drawCutPoints(void)
     }
 }
 
+void ADM_mwNavSlider::drawTimelineMarkers(void)
+{
+    if (timelineMarkers.empty() || !totalDuration || width() <= 1)
+        return;
+
+    QPainter painter(this);
+    QColor markerColor = palette().color(QPalette::Link);
+    markerColor.setAlpha(210);
+    painter.setPen(QPen(markerColor, 1));
+    painter.setBrush(markerColor);
+
+    for (size_t i = 0; i < timelineMarkers.size(); ++i)
+    {
+        uint64_t time = timelineMarkers[i].timeUs;
+        if (time > totalDuration)
+            continue;
+        int pos = static_cast<int>((static_cast<double>(time) * (width() - 1)) / static_cast<double>(totalDuration));
+        pos = std::max(1, std::min(width() - 2, pos));
+        if (layoutDirection() == Qt::RightToLeft)
+            pos = width() - 1 - pos;
+        painter.drawLine(pos, 1, pos, height() - 3);
+        QPolygon flag;
+        flag << QPoint(pos, 1) << QPoint(pos + 5, 1) << QPoint(pos, 6);
+        painter.drawPolygon(flag);
+    }
+}
+
 /**
     \fn paintEvent
 */
@@ -76,7 +105,7 @@ void ADM_mwNavSlider::paintEvent(QPaintEvent *event)
     drawCutPoints();
 
     QSlider::paintEvent(event);
-
+    drawTimelineMarkers();
     drawSelection();
 }
 /**
@@ -141,5 +170,17 @@ void ADM_mwNavSlider::wheelEvent(QWheelEvent *e)
 #else
     emit sliderAction(e->angleDelta().ry());
 #endif
+}
+
+void ADM_mwNavSlider::setTimelineMarkers(const std::vector<ADM_TimelineMarker> &markers)
+{
+    timelineMarkers = markers;
+    repaint();
+}
+
+void ADM_mwNavSlider::clearTimelineMarkers(void)
+{
+    timelineMarkers.clear();
+    repaint();
 }
 //EOF
