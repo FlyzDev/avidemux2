@@ -2,7 +2,7 @@
 
 A cross-platform community fork of [Avidemux](https://github.com/mean00/avidemux2) for fast copy-mode editing, with cached audio waveforms, Premiere/XMEML/CSV/JSON timeline marker import, and ready-to-run Windows x64 + macOS Apple Silicon builds.
 
-[![Latest preview](https://img.shields.io/github/v/release/FlyzDev/avidemux2?include_prereleases&display_name=tag&sort=semver)](https://github.com/FlyzDev/avidemux2/releases)
+[![Latest release](https://img.shields.io/github/v/release/FlyzDev/avidemux2?display_name=tag&sort=semver)](https://github.com/FlyzDev/avidemux2/releases/latest)
 [![Windows build](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml/badge.svg?branch=master)](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml)
 [![macOS ARM64 build](https://github.com/FlyzDev/avidemux2/actions/workflows/macos-arm64-waveform-build.yml/badge.svg?branch=master)](https://github.com/FlyzDev/avidemux2/actions/workflows/macos-arm64-waveform-build.yml)
 
@@ -76,7 +76,7 @@ Imported markers are session-local and do not replace Avidemux's A/B selection m
 
 ## Status
 
-This fork is currently an experimental preview. The Windows build is tested with generated multi-track media, portable dependency scanning, and a deterministic imported-marker navigation regression on 29.97 fps media. The macOS build is produced on Apple Silicon, verifies DMG integrity and ARM64 architecture, and is smoke-tested before publishing.
+This is an unofficial community release. The Windows build is tested with generated multi-track media, portable dependency scanning, and a deterministic imported-marker navigation regression on 29.97 fps media. The macOS build targets macOS 14+ on Apple Silicon, verifies DMG integrity and strict bundle signing, and is smoke-tested through LaunchServices before publishing.
 
 If you hit a hang or crash, open an issue with the source container/codec details and, when available, the Windows WER/ProcDump report or macOS crash report.
 
