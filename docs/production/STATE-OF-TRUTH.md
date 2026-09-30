@@ -8,13 +8,13 @@ This file is the compact source of truth for the `FlyzDev/avidemux2` waveform fo
 
 - GitHub: `FlyzDev/avidemux2`
 - Upstream: `mean00/avidemux2`
-- Active branch: `feat/waveform-ui`
+- Active/default branch: `master`
 - Marker import landed in `2edf751` (`[nativewin][macarm] feat: import timeline markers`).
 - Robust imported-marker seeking fix: `2bd0229` (`[nativewin][macarm] fix: robust imported marker seeking`).
 - macOS ad-hoc verification fix: `34fc929` (`[macarm] ci: validate upstream-style ad-hoc bundle`).
 - Deterministic marker-seek fixture: `f3bb02c` (`test: add imported marker seek regression fixture`).
 - Local Mac mini workspace: `/Users/flyzai/agent-workspaces/avidemux-waveform-work`
-- Default GitHub branch is still `master`; the feature branch has NOT yet been merged to `master`.
+- `feat/waveform-ui` was fast-forward merged to `master` at `9a608f0`.
 
 ## Stable / working
 
@@ -139,18 +139,20 @@ Mac mini runner / workspace:
 
 ## GitHub / public release status
 
-Release-ready state:
+Preview 1 is published.
 
-- Repository metadata and product-style README are prepared.
-- Windows native + portable final packages are green.
-- macOS ARM64 DMG/app ZIP are green and smoke-tested.
-- Imported-marker P0 is closed with a deterministic regression fixture and real Windows GUI validation.
-- Draft release exists: `v2.8.2-waveform.1` / `Avidemux Waveform 2.8.2 – Preview 1`.
-- Remaining operation at this point: merge feature branch to `master`, attach final assets/checksums, publish draft as prerelease.
+- Release: `Avidemux Waveform 2.8.2 – Preview 1`
+- Tag: `v2.8.2-waveform.1`
+- Tag target: `9a608f0d1d814d49237a3b8ed810846e6f842a09`
+- Published as GitHub prerelease on 2026-09-30.
+- Windows asset: `Avidemux-Waveform-Windows-x64-Portable.zip`
+- macOS assets: `Avidemux-Waveform-macOS-Apple-Silicon.dmg` and `Avidemux-Waveform-macOS-Apple-Silicon.app.zip`
+- Checksum manifest: `SHA256SUMS.txt`
+- Public release URL: https://github.com/FlyzDev/avidemux2/releases/tag/v2.8.2-waveform.1
 
 ## Next order of work
 
-1. Merge the validated `feat/waveform-ui` branch to `master`.
-2. Attach final Windows portable ZIP, macOS DMG/app ZIP and checksum manifest to `v2.8.2-waveform.1`.
-3. Publish Preview 1 as a prerelease.
-4. After Preview 1, collect user feedback before further waveform/marker feature expansion.
+1. Collect Preview 1 user feedback and crash/hang reports.
+2. Fix any release-blocking regressions before expanding marker/waveform scope.
+3. Keep Windows portable and macOS ARM64 packaging workflows green for subsequent previews.
+4. Consider Intel macOS / Linux binaries only after the current Windows + Apple Silicon preview stabilizes.
