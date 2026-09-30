@@ -74,11 +74,9 @@ Use the **M+** button beside the navigation controls to import timeline markers.
 
 Imported markers are session-local and do not replace Avidemux's A/B selection markers. They appear as marker lines on the seek bar and waveform. Use **M◀ / M▶** or **Alt+Left / Alt+Right** to jump to the previous or next imported marker.
 
-> **Preview known issue:** imported marker rendering/import works, but Previous / Next marker navigation can still fail on some media when the marker timestamp is not directly seekable as an exact decoded frame PTS. The current preview may show `Error seeking to … ms`. This is the highest-priority open bug and must be fixed before the first public release.
-
 ## Status
 
-This fork is currently an experimental preview. The Windows build is tested with a generated multi-track fixture and a portable dependency scan. The macOS build is produced on Apple Silicon and smoke-tested before publishing.
+This fork is currently an experimental preview. The Windows build is tested with generated multi-track media, portable dependency scanning, and a deterministic imported-marker navigation regression on 29.97 fps media. The macOS build is produced on Apple Silicon, verifies DMG integrity and ARM64 architecture, and is smoke-tested before publishing.
 
 If you hit a hang or crash, open an issue with the source container/codec details and, when available, the Windows WER/ProcDump report or macOS crash report.
 
