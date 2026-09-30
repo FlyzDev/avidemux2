@@ -2,7 +2,7 @@
 
 A community fork of [Avidemux](https://github.com/mean00/avidemux2) that adds a fast, cached audio waveform to the classic Avidemux editing workflow.
 
-[![Latest release](https://img.shields.io/github/v/release/FlyzDev/avidemux2?display_name=tag&sort=semver)](https://github.com/FlyzDev/avidemux2/releases/latest)
+[![Latest preview](https://img.shields.io/github/v/release/FlyzDev/avidemux2?include_prereleases&display_name=tag&sort=semver)](https://github.com/FlyzDev/avidemux2/releases)
 [![Windows build](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml/badge.svg?branch=master)](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml)
 [![macOS ARM64 build](https://github.com/FlyzDev/avidemux2/actions/workflows/macos-arm64-waveform-build.yml/badge.svg?branch=master)](https://github.com/FlyzDev/avidemux2/actions/workflows/macos-arm64-waveform-build.yml)
 
@@ -16,8 +16,8 @@ The waveform is generated in the background. You can continue seeking and workin
 
 | Platform | Build | Download |
 | --- | --- | --- |
-| Windows 10/11 x64 | Portable | [Latest release](https://github.com/FlyzDev/avidemux2/releases/latest) |
-| macOS Apple Silicon | DMG / app zip | [Latest release](https://github.com/FlyzDev/avidemux2/releases/latest) |
+| Windows 10/11 x64 | Portable | [Latest release](https://github.com/FlyzDev/avidemux2/releases) |
+| macOS Apple Silicon | DMG / app zip | [Latest release](https://github.com/FlyzDev/avidemux2/releases) |
 | Source | Git | [Releases](https://github.com/FlyzDev/avidemux2/releases) |
 
 Intel macOS and Linux binaries are not published yet. The source remains cross-platform.
