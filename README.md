@@ -17,7 +17,7 @@ The waveform is generated in the background. You can continue seeking and workin
 | Platform | Build | Download |
 | --- | --- | --- |
 | Windows 10/11 x64 | Portable | [Latest release](https://github.com/FlyzDev/avidemux2/releases) |
-| macOS Apple Silicon | DMG / app zip | [Latest release](https://github.com/FlyzDev/avidemux2/releases) |
+| macOS 14+ Apple Silicon | DMG / app zip | [Latest release](https://github.com/FlyzDev/avidemux2/releases) |
 | Source | Git | [Releases](https://github.com/FlyzDev/avidemux2/releases) |
 
 Intel macOS and Linux binaries are not published yet. The source remains cross-platform.
@@ -50,7 +50,7 @@ No installer is required. Keep the DLLs and plugin folders next to the executabl
 
 Download the Apple Silicon DMG from the latest release and drag the app to Applications. The community build is ad-hoc signed but is not Apple-notarized, so macOS may require **Right click → Open** the first time.
 
-The current macOS binary targets Apple Silicon (M1/M2/M3/M4 and newer ARM64 Macs).
+The current macOS binary targets **macOS 14+** on Apple Silicon (M1/M2/M3/M4 and newer ARM64 Macs). The release DMG is checksum-verified, strict ad-hoc code-signature verified, and smoke-tested by mounting the DMG and launching the packaged app through macOS LaunchServices.
 
 ## Using the waveform
 
