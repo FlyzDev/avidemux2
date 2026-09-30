@@ -9,8 +9,10 @@ This file is the compact source of truth for the `FlyzDev/avidemux2` waveform fo
 - GitHub: `FlyzDev/avidemux2`
 - Upstream: `mean00/avidemux2`
 - Active branch: `feat/waveform-ui`
-- Current code commit containing marker import: `2edf751` (`[nativewin][macarm] feat: import timeline markers`)
-- Current branch head after portable validation: `4e2f8fa` (`[winpost] validate marker-enabled portable build`)
+- Marker import landed in `2edf751` (`[nativewin][macarm] feat: import timeline markers`).
+- Robust imported-marker seeking fix: `2bd0229` (`[nativewin][macarm] fix: robust imported marker seeking`).
+- macOS ad-hoc verification fix: `34fc929` (`[macarm] ci: validate upstream-style ad-hoc bundle`).
+- Deterministic marker-seek fixture: `f3bb02c` (`test: add imported marker seek regression fixture`).
 - Local Mac mini workspace: `/Users/flyzai/agent-workspaces/avidemux-waveform-work`
 - Default GitHub branch is still `master`; the feature branch has NOT yet been merged to `master`.
 
@@ -54,116 +56,101 @@ Implemented in commit `2edf751`.
 - Parser tests for XML / CSV / JSON passed locally.
 - Windows native build with marker support passed.
 
-## P0 — open blocker: imported marker navigation seek error
+## P0 — resolved: imported marker navigation seek error
 
-**This is the FIRST issue to solve in the next chat. Do not start release work before it is fixed and reproduced cleanly.**
+Resolved in `2bd0229`.
 
-User reproduction on Windows:
+Root cause:
 
-- Import markers into a ~3 minute video.
-- Press previous / next imported-marker button.
-- Some marker targets work, but some can show a modal error such as:
-  - `Error seeking to 75000 ms`
-- Screenshot was captured in the originating chat on 2026-09-30.
+- Imported marker navigation called `GUI_GoToTime(target)`, which requires an exact decodable frame PTS.
+- Premiere/XMEML marker times are timeline positions and may fall between actual frame PTS values.
+- On 29.97 fps media this produced modal errors such as `Error seeking to 15000 ms` / `75000 ms`.
 
-Current marker navigation implementation:
+Fix:
 
-- `avidemux/qt4/ADM_userInterfaces/ADM_gui/Q_gui2.cpp`
-- `MainWindow::seekTimelineMarker(bool forward)` around lines 329–364 at commit `4e2f8fa`.
-- It chooses an imported marker timestamp and calls `GUI_GoToTime(target)` directly.
+- Imported marker navigation now uses `GUI_GoToTimeNearestFrame`.
+- It first tries exact seek, then falls back via previous/next keyframes and approaches the requested timeline time from a decodable point.
+- Hard failure restores the previous PTS.
+- Existing A/B marker navigation behavior was left unchanged.
 
-Error source:
+Deterministic Windows validation:
 
-- `avidemux/common/gui_navigate.cpp`
-- `GUI_GoToTime(uint64_t time)` around lines 865–877.
-- It calls `video_body->goToTimeVideo(time)` once and opens `GUI_Error_HIG(...)` when the requested microsecond timestamp is not directly seekable / decodable.
-
-Very important comparison already identified:
-
-- Existing Avidemux **A/B marker navigation** in `gui_navigate.cpp` around the `ACT_GotoMarkA` / `ACT_GotoMarkB` case already handles this exact class of failure much more robustly.
-- When `goToTimeVideo(pts)` fails, it tries previous keyframe / next keyframe and approaches the requested marker, preserving a rescue PTS.
-- Imported marker navigation should likely reuse or factor out this robust logic instead of calling naive `GUI_GoToTime(target)`.
-- Do not assume the imported timestamp itself is malformed just because `goToTimeVideo` rejects it: Premiere marker time is a timeline time, while Avidemux may require a decodable frame PTS / keyframe-assisted seek.
-
-Acceptance criteria for P0:
-
-1. Import the 5-marker test XML into a ~3 minute video.
-2. Repeatedly press previous / next through every marker in both directions.
-3. No `Error seeking to ... ms` modal.
-4. Navigation lands on the marker or the nearest valid frame consistently.
-5. A/B marker navigation remains unchanged.
-6. No regression in normal timeline dragging or waveform generation.
+- Generated 180 s H.264 at `30000/1001` fps with a long GOP.
+- Imported markers at 15 s / 45 s / 75 s / 105 s / 150 s.
+- Old package consistently reproduced the modal.
+- Final portable package passed 5/5 forward and 5/5 backward with no modal.
+- Nearest-frame landings were `15.015`, `45.011`, `75.008`, `105.004`, `150.016` seconds.
+- Fixture: `docs/production/fixtures/MARKER-SEEK-REPRO.md`.
 
 ## Windows build status
 
-Marker-enabled full native package:
+Final native package:
 
 - Workflow: `Windows native waveform package`
-- Run: `36649741097`
+- Run: `36682955126`
 - Result: success
-- Head: `2edf751`
+- Code head: `2bd0229`
+- Artifact ID: `11083627270`
+- Artifact name: `avidemux-waveform-windows-native-x64`
+- Artifact digest: `sha256:319feaaf03f3fb90c340fd7054c4ecbec89f148eed28620690af76ad4875d630`
 
-Marker-enabled portable validation:
+Final portable package:
 
 - Workflow: `Windows waveform portable postprocess`
-- Run: `36679279732`
+- Run: `36685360993`
 - Result: success
-- Head: `4e2f8fa`
-- Artifact ID: `11081366719`
+- Dispatch head: `f3bb02c`
+- Source native package: successful `2bd0229` native artifact above.
+- Artifact ID: `11083855798`
 - Artifact name: `avidemux-waveform-windows-portable-x64`
-- GitHub artifact digest: `sha256:ee40fe11b1f19cf3a8a2b41c364b9ab3731bf824594577db5e8fceb342073d6c`
+- Artifact digest: `sha256:701552f78dc76e4bc86126708efc6ce7603404143affa592340a6225537efdb7`
+- Inner portable ZIP SHA-256: `EF8A25B4D9975E3BB45AD39EC29B360FAF22EECA2E95DDF48C17EB90E705D88B`
+- Dependency scan and generated multi-track smoke launch passed.
+- Mainframe real-GUI imported-marker regression passed in both directions.
 
-Mainframe test PC currently has the official CI portable package in:
-
-- `C:\Users\musta\Downloads\Avidemux-Waveform-Markers-Windows-x64.zip`
-- Same package is also copied to `C:\Users\musta\Downloads\avidemux-waveform-win64-portable.zip`
-- Inner portable ZIP SHA-256: `A7CC5800E6874D54D4E421CC50496DE1B03431074CB5DAA3D4A94471CA45BA28`
-
-Remote Desktop Commander Mainframe device ID:
+Mainframe device:
 
 - `cf5c57b1-3c3a-44ee-81a6-4f6393fdb4be`
 
 ## macOS Apple Silicon status
 
-The Apple Silicon pipeline is close but not publishable yet.
+Apple Silicon packaging is green.
 
 - Workflow: `macOS ARM64 waveform build`
-- Marker-enabled run: `36649741021`
-- Result: failure after a long successful build/package path; no artifact uploaded.
-- The workflow reached creation of the self-contained `.app` / DMG but the strict verification step failed with an ad-hoc bundle signature/resource mismatch (`code has no resources but signature indicates they must be present`).
-- Workflow file: `.github/workflows/macos-arm64-waveform-build.yml`
-- The workflow uses a case-sensitive APFS sparse image because Avidemux requires a case-sensitive source/build filesystem on macOS.
-- It is intended to publish:
-  - `Avidemux-Waveform-macOS-Apple-Silicon.dmg`
-  - `Avidemux-Waveform-macOS-Apple-Silicon.app.zip`
-- After P0 marker seek is fixed, repair the codesign verification to match the upstream/ad-hoc packaging model, then smoke launch the packaged app with the multi-track fixture before publishing.
+- Run: `36683260734`
+- Result: success
+- Head: `34fc929`
+- Artifact ID: `11082739166`
+- Artifact name: `avidemux-waveform-macos-arm64`
+- Artifact digest: `sha256:4634154b6d041c5998daf4d17c29348d887e3abd3114ea779d25ebb6aa0c3c2f`
+- DMG SHA-256: `ed85a1473d987c0a0632329326d27741ffd38c63e239144eec2f5395569b4ecb`
+- App ZIP SHA-256: `5628a8db9284ff212f60967f2b3ad95a8dd5579fc6435d0ef288838d38659e29`
+- `hdiutil verify` passed.
+- Main GUI executable is Mach-O `arm64`.
+- Representative upstream ad-hoc signed components passed `codesign --verify`.
+- Packaged app smoke launch with the generated multi-track fixture passed.
+- The incompatible whole-bundle `codesign --verify --deep --strict` gate was removed because upstream's own ad-hoc signing flow explicitly tolerates the main bundle-format warning.
 
 Mac mini runner / workspace:
 
 - Device: `e839f56f-5a89-4f77-a40e-abaa5ac162f4`
 - Workspace: `/Users/flyzai/agent-workspaces/avidemux-waveform-work`
-- Self-hosted runner name: `avidemux-waveform-mac-arm64`
+- Self-hosted runner: `avidemux-waveform-mac-arm64`
 
 ## GitHub / public release status
 
-Already done:
+Release-ready state:
 
-- Repository description updated to describe the waveform fork.
-- Homepage points to `releases/latest`.
-- Topics include Avidemux, waveform, video editing, Qt6, FFmpeg, Windows and macOS.
-- Feature-branch README has been redesigned as a product landing page with download/install/feature/marker sections.
-
-Not done yet:
-
-- No public stable/preview GitHub Release containing both Windows and macOS packages.
-- Feature branch is not merged to default `master`, so the redesigned README is not yet the default GitHub landing page.
-- Do not merge/publish the release until P0 marker navigation is fixed and the macOS artifact passes smoke verification.
+- Repository metadata and product-style README are prepared.
+- Windows native + portable final packages are green.
+- macOS ARM64 DMG/app ZIP are green and smoke-tested.
+- Imported-marker P0 is closed with a deterministic regression fixture and real Windows GUI validation.
+- Draft release exists: `v2.8.2-waveform.1` / `Avidemux Waveform 2.8.2 – Preview 1`.
+- Remaining operation at this point: merge feature branch to `master`, attach final assets/checksums, publish draft as prerelease.
 
 ## Next order of work
 
-1. **P0: Fix previous/next imported-marker navigation seek failures.**
-2. Add a regression path for marker navigation (at minimum a deterministic manual/integration fixture; preferably a reusable helper test).
-3. Rebuild Windows native + portable and verify the user's failing 3-minute case.
-4. Fix macOS packaging verification and produce smoke-tested ARM64 DMG/app zip.
-5. Merge the stable feature branch to `master` (or otherwise make the redesigned README the default landing page).
-6. Create a GitHub preview release and upload Windows + macOS packages with checksums and concise release notes.
+1. Merge the validated `feat/waveform-ui` branch to `master`.
+2. Attach final Windows portable ZIP, macOS DMG/app ZIP and checksum manifest to `v2.8.2-waveform.1`.
+3. Publish Preview 1 as a prerelease.
+4. After Preview 1, collect user feedback before further waveform/marker feature expansion.
