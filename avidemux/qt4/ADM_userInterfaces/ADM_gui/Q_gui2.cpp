@@ -116,7 +116,7 @@ extern void destroyTranslator(void);
 extern ADM_RENDER_TYPE UI_getPreferredRender(void);
 extern int A_openVideo(const char *name);
 extern int A_appendVideo(const char *name);
-extern bool GUI_GoToTime(uint64_t time);
+extern bool GUI_GoToTimeNearestFrame(uint64_t time);
 
 int SliderIsShifted = 0;
 static void setupMenus(void);
@@ -360,7 +360,7 @@ void MainWindow::seekTimelineMarker(bool forward)
     }
 
     if (target != ADM_NO_PTS)
-        GUI_GoToTime(target);
+        GUI_GoToTimeNearestFrame(target);
 }
 
 void MainWindow::previousTimelineMarker(void)

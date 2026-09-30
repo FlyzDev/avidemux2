@@ -860,6 +860,94 @@ void GUI_NextCutPoint()
 }
 
 /**
+ * \brief Seek to a timeline timestamp, falling back to the nearest decodable frame.
+ *
+ * Unlike GUI_GoToTime(), this helper is intended for imported timeline markers.
+ * Marker timestamps are timeline positions and don't necessarily match a frame PTS
+ * exactly. Reuse the same recovery strategy as A/B marker navigation without
+ * presenting an error modal for the expected exact-PTS mismatch.
+ */
+bool GUI_GoToTimeNearestFrame(uint64_t pts)
+{
+    if (!video_body || pts == ADM_NO_PTS)
+        return false;
+
+    const uint64_t rescue = admPreview::getCurrentPts();
+    const uint64_t duration = video_body->getVideoDuration();
+
+    if (pts > duration)
+        pts = duration;
+
+    ADM_info("Timeline marker seek: current=%" PRIu64 " us, target=%" PRIu64 " us, duration=%" PRIu64 " us\n",
+             rescue, pts, duration);
+
+    if (!pts)
+    {
+        video_body->rewind();
+    }
+    else if (pts == duration)
+    {
+        uint64_t start = video_body->getLastKeyFramePts();
+        ADM_info("Timeline marker seek: end target, last keyframe=%" PRIu64 " us\n", start);
+        if (start == ADM_NO_PTS || false == GUI_infiniteForward(start))
+        {
+            ADM_warning("Timeline marker seek: failed to reach end, restoring %" PRIu64 " us\n", rescue);
+            admPreview::seekToTime(rescue);
+            return false;
+        }
+    }
+    else
+    {
+        const bool direct = video_body->goToTimeVideo(pts);
+        ADM_info("Timeline marker seek: direct goToTimeVideo=%d\n", direct ? 1 : 0);
+        if (!direct)
+        {
+            uint64_t start = pts;
+            if (video_body->getPKFramePTS(&start) && start != ADM_NO_PTS)
+            {
+                ADM_info("Timeline marker seek: previous keyframe candidate=%" PRIu64 " us\n", start);
+                admPreview::deferDisplay(true);
+                if (false == admPreview::seekToIntraPts(start))
+                {
+                    ADM_warning("Timeline marker seek: previous-keyframe seek failed, restoring %" PRIu64 " us\n", rescue);
+                    admPreview::seekToTime(rescue);
+                    admPreview::deferDisplay(false);
+                    return false;
+                }
+
+                while (pts > admPreview::getCurrentPts() && admPreview::nextPicture())
+                {
+                }
+                admPreview::deferDisplay(false);
+            }
+            else
+            {
+                start = pts;
+                if (false == video_body->getNKFramePTS(&start) || start == ADM_NO_PTS)
+                {
+                    ADM_warning("Timeline marker seek: no usable previous/next keyframe, restoring %" PRIu64 " us\n", rescue);
+                    admPreview::seekToTime(rescue);
+                    return false;
+                }
+
+                ADM_info("Timeline marker seek: next keyframe candidate=%" PRIu64 " us\n", start);
+                if (false == admPreview::seekToIntraPts(start))
+                {
+                    ADM_warning("Timeline marker seek: next-keyframe seek failed, restoring %" PRIu64 " us\n", rescue);
+                    admPreview::seekToTime(rescue);
+                    return false;
+                }
+            }
+        }
+    }
+
+    admPreview::samePicture();
+    GUI_setCurrentFrameAndTime();
+    ADM_info("Timeline marker seek: final PTS=%" PRIu64 " us\n", admPreview::getCurrentPts());
+    return true;
+}
+
+/**
     \fn GUI_GoToTime
 */
 bool GUI_GoToTime(uint64_t time)
