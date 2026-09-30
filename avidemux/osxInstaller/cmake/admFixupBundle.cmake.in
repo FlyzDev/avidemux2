@@ -50,20 +50,23 @@ FOREACH(v ${vs})
         FILE(REMOVE "${v}")
 ENDFOREACH(v ${vs})
 
-# Remove the copies of Qt lib in framework, we only keep "5"
-FILE(GLOB  frameworks "@BUNDLE@/Contents/Frameworks/*")
+# Trim copied Qt frameworks while keeping a valid macOS framework bundle layout.
+# LaunchServices and codesign expect Versions/Current plus the top-level binary symlink.
+FILE(GLOB frameworks "@BUNDLE@/Contents/Frameworks/*.framework")
 MESSAGE(STATUS "Frameworks to clean : ${frameworks}")
 FOREACH(frame ${frameworks})
         MESSAGE(STATUS "    Cleaning ${frame}")
-        FILE(REMOVE_RECURSE  "${frame}/Headers")
-        FILE(GLOB  qtop      "${frame}/Qt*")
-        FOREACH(q ${qtop})
-                MESSAGE(STATUS "  >${q}")
-                FILE(REMOVE    "${q}")
-        ENDFOREACH(q ${qtop})
-        FILE(REMOVE_RECURSE  "${frame}/Versions/Current")
-        FILE(REMOVE_RECURSE  "${frame}/Versions/@ADM_QT_VERSION@/Headers")
-        # Create symlinks ?
+        GET_FILENAME_COMPONENT(frameName "${frame}" NAME_WE)
+        FILE(REMOVE_RECURSE "${frame}/Headers")
+        FILE(REMOVE "${frame}/${frameName}")
+        FILE(REMOVE_RECURSE "${frame}/Versions/Current")
+        FILE(REMOVE_RECURSE "${frame}/Versions/@ADM_QT_VERSION@/Headers")
+        IF(EXISTS "${frame}/Versions/A/${frameName}")
+                EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -E create_symlink
+                        "A" "${frame}/Versions/Current")
+                EXECUTE_PROCESS(COMMAND "${CMAKE_COMMAND}" -E create_symlink
+                        "Versions/Current/${frameName}" "${frame}/${frameName}")
+        ENDIF()
 ENDFOREACH(frame ${frameworks})
 
 IF(ADM_CPU_ARM64)

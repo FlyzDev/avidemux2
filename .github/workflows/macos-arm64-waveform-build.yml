@@ -12,6 +12,11 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[macarm]')
     runs-on: [self-hosted, macOS, ARM64, waveform]
     timeout-minutes: 120
+    env:
+      # Homebrew Qt 6 in the release bundle requires macOS 14.0.
+      # Keep our own binaries at the same deployment target instead of
+      # inheriting the newest installed SDK version.
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,12 +63,9 @@ jobs:
           test -n "$DMG" && test -f "$DMG"
           test -x "$APP/Contents/MacOS/Avidemux2.8"
 
-          # Upstream ad-hoc packaging deliberately tolerates a bundle-format warning
-          # when re-signing the main GUI binary. Verifying the whole .app with
-          # --deep --strict therefore rejects an otherwise runnable upstream-style
-          # bundle. Verify representative components which the upstream signing
-          # script signs successfully, then rely on architecture, DMG integrity and
-          # the packaged-GUI smoke launch below for release gating.
+          # The packaged bundle must be valid to LaunchServices, not merely runnable
+          # by invoking its Mach-O executable directly.
+          codesign --verify --deep --strict "$APP"
           codesign --verify "$APP/Contents/MacOS/avidemux_cli"
           codesign --verify "$APP/Contents/MacOS/avidemux_jobs"
           codesign --verify "$APP/Contents/Frameworks/QtCore.framework/Versions/A/QtCore"
@@ -72,6 +74,9 @@ jobs:
           file "$APP/Contents/MacOS/Avidemux2.8" | tee "$GITHUB_WORKSPACE/macos-arm64-file.txt"
           lipo -archs "$APP/Contents/MacOS/Avidemux2.8" | tee "$GITHUB_WORKSPACE/macos-arm64-archs.txt"
           grep -qw arm64 "$GITHUB_WORKSPACE/macos-arm64-archs.txt"
+          MIN_OS=$(vtool -show-build "$APP/Contents/MacOS/Avidemux2.8" | awk '/minos/{print $2; exit}')
+          echo "macOS deployment target: $MIN_OS"
+          test "$MIN_OS" = "$MACOSX_DEPLOYMENT_TARGET"
           echo "APP=$APP" >> "$GITHUB_ENV"
           echo "DMG=$DMG" >> "$GITHUB_ENV"
 
@@ -88,24 +93,41 @@ jobs:
             -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest \
             "$GITHUB_WORKSPACE/macos-waveform-multitrack-test.mkv"
 
-      - name: Smoke launch packaged app
+      - name: Smoke launch packaged DMG app through LaunchServices
         shell: bash
         run: |
           set -euo pipefail
           VOLUME="/Volumes/AvidemuxWaveformCI"
           cd "$VOLUME/src"
-          APP="$VOLUME/src/$APP"
-          BIN="$APP/Contents/MacOS/Avidemux2.8"
+          DMG_PATH="$VOLUME/src/$DMG"
           LOG="$GITHUB_WORKSPACE/macos-waveform-smoke.log"
-          "$BIN" "$GITHUB_WORKSPACE/macos-waveform-multitrack-test.mkv" >"$LOG" 2>&1 &
-          PID=$!
+          MOUNT=""
+          cleanup() {
+            pkill -x Avidemux2.8 2>/dev/null || true
+            if [ -n "$MOUNT" ]; then
+              hdiutil detach "$MOUNT" -force >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+
+          ATTACH=$(hdiutil attach -nobrowse -readonly "$DMG_PATH")
+          MOUNT=$(printf '%s\n' "$ATTACH" | awk '/\/Volumes\//{sub(/^.*\/Volumes\//,"/Volumes/"); print; exit}')
+          test -n "$MOUNT" && test -d "$MOUNT"
+          MOUNT_APP=$(find "$MOUNT" -maxdepth 2 -type d -name 'Avidemux-*.app' -print -quit)
+          test -n "$MOUNT_APP" && test -d "$MOUNT_APP"
+
+          # This is the same path Finder uses. It catches incompatible deployment
+          # targets and malformed framework bundles which direct executable launch
+          # can miss.
+          pkill -x Avidemux2.8 2>/dev/null || true
+          open -na "$MOUNT_APP" --args "$GITHUB_WORKSPACE/macos-waveform-multitrack-test.mkv" >"$LOG" 2>&1
           sleep 10
-          if ! kill -0 "$PID" 2>/dev/null; then
+          PID=$(pgrep -x Avidemux2.8 | head -1 || true)
+          if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
             cat "$LOG"
             exit 1
           fi
-          kill "$PID" 2>/dev/null || true
-          wait "$PID" 2>/dev/null || true
+          ps -p "$PID" -o pid=,stat=,command= | tee -a "$LOG"
           cat "$LOG" || true
 
       - name: Stage macOS release artifacts
