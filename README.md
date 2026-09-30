@@ -1,6 +1,6 @@
-# Avidemux Waveform
+# Avidemux Waveform + Markers
 
-A community fork of [Avidemux](https://github.com/mean00/avidemux2) that adds a fast, cached audio waveform to the classic Avidemux editing workflow.
+A cross-platform community fork of [Avidemux](https://github.com/mean00/avidemux2) for fast copy-mode editing, with cached audio waveforms, Premiere/XMEML/CSV/JSON timeline marker import, and ready-to-run Windows x64 + macOS Apple Silicon builds.
 
 [![Latest preview](https://img.shields.io/github/v/release/FlyzDev/avidemux2?include_prereleases&display_name=tag&sort=semver)](https://github.com/FlyzDev/avidemux2/releases)
 [![Windows build](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml/badge.svg?branch=master)](https://github.com/FlyzDev/avidemux2/actions/workflows/windows-native-package.yml)
@@ -8,7 +8,7 @@ A community fork of [Avidemux](https://github.com/mean00/avidemux2) that adds a 
 
 ## Why this fork exists
 
-Avidemux is excellent for quick cuts and stream-copy exports, but the stock timeline does not show audio. This fork keeps the lightweight Avidemux workflow and adds the waveform information needed to find speech, silence, beats and cut points quickly.
+Avidemux is excellent for quick cuts and stream-copy exports, but the stock timeline does not show audio and has limited interchange for editor markers. This fork keeps the lightweight workflow while adding visual audio navigation and timeline marker import for faster review, cutting and handoff.
 
 The waveform is generated in the background. You can continue seeking and working while it fills in, and cached peak data is reused the next time the same edit state is opened.
 
