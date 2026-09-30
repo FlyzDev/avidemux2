@@ -114,22 +114,26 @@ Mainframe device:
 
 ## macOS Apple Silicon status
 
-Apple Silicon packaging is green.
+Apple Silicon packaging is green and release-validated.
 
+- Minimum OS: **macOS 14.0**.
+- Fix commit: `c987bb5` (`[macarm] fix: make macOS bundle LaunchServices compatible`).
 - Workflow: `macOS ARM64 waveform build`
-- Run: `36683260734`
+- Final run: `36689839945`
 - Result: success
-- Head: `34fc929`
-- Artifact ID: `11082739166`
+- Head: `c987bb505aad24f1b24c4ffab78c3921f3aae827`
+- Artifact ID: `11085504140`
 - Artifact name: `avidemux-waveform-macos-arm64`
-- Artifact digest: `sha256:4634154b6d041c5998daf4d17c29348d887e3abd3114ea779d25ebb6aa0c3c2f`
-- DMG SHA-256: `ed85a1473d987c0a0632329326d27741ffd38c63e239144eec2f5395569b4ecb`
-- App ZIP SHA-256: `5628a8db9284ff212f60967f2b3ad95a8dd5579fc6435d0ef288838d38659e29`
-- `hdiutil verify` passed.
-- Main GUI executable is Mach-O `arm64`.
-- Representative upstream ad-hoc signed components passed `codesign --verify`.
-- Packaged app smoke launch with the generated multi-track fixture passed.
-- The incompatible whole-bundle `codesign --verify --deep --strict` gate was removed because upstream's own ad-hoc signing flow explicitly tolerates the main bundle-format warning.
+- Artifact digest: `sha256:a5609240759b4d3515f22162382da2a42dcb50d0529cf5372f6e9227eeada4a7`
+- Final DMG SHA-256: `c8f1aeb2c815f24131c9d0cda92f8ea10edf14d8752d5a99f23270b49378442c`
+- Final app ZIP SHA-256: `26f9d780e75b1b4b3e43118ddc5665dacb805715a4f6dfdc81882ddf328642ce`
+- Root cause of the first public macOS asset issue: the bootstrap script overwrote `MACOSX_DEPLOYMENT_TARGET` with the newest installed SDK version, producing a main binary with minimum macOS 26.4 on a macOS 26.2 runner; the Qt framework cleanup also removed framework symlinks needed for a valid bundle.
+- Bootstrap now honors an externally supplied deployment target; CI pins it to macOS 14.0, matching bundled Homebrew Qt requirements.
+- Qt framework `Versions/Current` and top-level binary symlinks are preserved/restored.
+- The full application bundle is ad-hoc signed and passes `codesign --verify --deep --strict`.
+- `hdiutil verify` passes.
+- The final DMG was mounted and the contained app was launched through LaunchServices (`open -na`), matching Finder-style launch behavior.
+- The published Preview 1 macOS assets were replaced with this corrected, validated build.
 
 Mac mini runner / workspace:
 
@@ -143,10 +147,10 @@ Preview 1 is published.
 
 - Release: `Avidemux Waveform 2.8.2 – Preview 1`
 - Tag: `v2.8.2-waveform.1`
-- Tag target: `9a608f0d1d814d49237a3b8ed810846e6f842a09`
+- Tag target: `c987bb505aad24f1b24c4ffab78c3921f3aae827`
 - Published as GitHub prerelease on 2026-09-30.
 - Windows asset: `Avidemux-Waveform-Windows-x64-Portable.zip`
-- macOS assets: `Avidemux-Waveform-macOS-Apple-Silicon.dmg` and `Avidemux-Waveform-macOS-Apple-Silicon.app.zip`
+- macOS assets: `Avidemux-Waveform-macOS-Apple-Silicon.dmg` and `Avidemux-Waveform-macOS-Apple-Silicon.app.zip` (final macOS 14+ LaunchServices-validated replacements)
 - Checksum manifest: `SHA256SUMS.txt`
 - Public release URL: https://github.com/FlyzDev/avidemux2/releases/tag/v2.8.2-waveform.1
 
