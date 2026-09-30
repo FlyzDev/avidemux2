@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xmeml>
+<xmeml version="4">
+  <sequence id="sequence-1">
+    <name>Imported Marker Navigation Regression</name>
+    <rate>
+      <timebase>60</timebase>
+      <ntsc>FALSE</ntsc>
+    </rate>
+    <marker><name>Marker 1</name><comment>15 seconds</comment><in>900</in><out>-1</out></marker>
+    <marker><name>Marker 2</name><comment>45 seconds</comment><in>2700</in><out>-1</out></marker>
+    <marker><name>Marker 3</name><comment>75 seconds</comment><in>4500</in><out>-1</out></marker>
+    <marker><name>Marker 4</name><comment>105 seconds</comment><in>6300</in><out>-1</out></marker>
+    <marker><name>Marker 5</name><comment>150 seconds</comment><in>9000</in><out>-1</out></marker>
+  </sequence>
+</xmeml>
