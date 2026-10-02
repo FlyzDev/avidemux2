@@ -27,6 +27,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Manual release validation can leave a read-only copy of a previous
+          # DMG mounted. CPack may then resolve bundle resources through that
+          # stale volume and fail with "Operation not permitted". Ensure every
+          # prior Avidemux waveform test mount is gone before packaging.
+          find /Volumes -maxdepth 1 -type d -name 'Avidemux-Waveform-macOS-Apple-Silicon*' -print0 2>/dev/null |
+            while IFS= read -r -d '' stale; do
+              hdiutil detach "$stale" -force >/dev/null 2>&1 || true
+            done
+
           IMAGE="$HOME/AvidemuxWaveformCI.sparseimage"
           VOLUME="/Volumes/AvidemuxWaveformCI"
           if ! mount | grep -q " on $VOLUME "; then
