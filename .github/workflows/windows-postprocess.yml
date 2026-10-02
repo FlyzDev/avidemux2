@@ -3,6 +3,7 @@ name: Windows waveform portable postprocess
 on:
   push:
     branches:
+      - master
       - feat/waveform-ui
   workflow_dispatch:
 
@@ -24,7 +25,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $runs = gh run list --repo "${{ github.repository }}" --workflow "Windows native waveform package" --branch feat/waveform-ui --status success --limit 1 --json databaseId,headSha | ConvertFrom-Json
+          $branch = "${{ github.ref_name }}"
+          $runs = gh run list --repo "${{ github.repository }}" --workflow "Windows native waveform package" --branch $branch --status success --limit 1 --json databaseId,headSha | ConvertFrom-Json
           if (-not $runs) { throw "No successful native Windows package run found." }
           $runId = $runs[0].databaseId
           Write-Host "Using run $runId at $($runs[0].headSha)"

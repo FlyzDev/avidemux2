@@ -3,6 +3,7 @@ name: Windows waveform build
 on:
   push:
     branches:
+      - master
       - feat/waveform-ui
   workflow_dispatch:
 
@@ -12,6 +13,7 @@ concurrency:
 
 jobs:
   mingw-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'feat/waveform-ui' || contains(github.event.head_commit.message, '[nativewin]') || contains(github.event.head_commit.message, '[winsmoke]')
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -50,6 +52,7 @@ jobs:
           grep -q 'ADM_waveformIndexer.cpp' avidemux/common/ADM_editor/src/CMakeLists.txt
           test -f avidemux/qt4/i18n/CMakeLists.txt
   native-msys2-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'feat/waveform-ui' || contains(github.event.head_commit.message, '[nativewin]') || contains(github.event.head_commit.message, '[winsmoke]')
     runs-on: windows-latest
     timeout-minutes: 30
     steps:

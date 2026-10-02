@@ -3,6 +3,7 @@ name: Windows native waveform package
 on:
   push:
     branches:
+      - master
       - feat/waveform-ui
   workflow_dispatch:
 
