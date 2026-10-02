@@ -38,6 +38,7 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-base
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-ffmpeg
+            mingw-w64-ucrt-x86_64-ffnvcodec-headers
             mingw-w64-ucrt-x86_64-SDL2
             mingw-w64-ucrt-x86_64-libass
             mingw-w64-ucrt-x86_64-libvpx
@@ -60,6 +61,12 @@ jobs:
           PREFIX="$ROOT/native-win-prefix"
           mkdir -p "$PREFIX"
 
+          # NVDEC and NVENC share Avidemux's USE_NVENC build feature. The
+          # ffnvcodec package is header-only; NVIDIA's driver supplies the
+          # runtime CUDA / NVDEC / NVENC libraries on the user's machine.
+          pkg-config --modversion ffnvcodec
+          test -f /ucrt64/include/ffnvcodec/dynlink_loader.h
+
           cmake -S avidemux_core -B buildNativeCore -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PREFIX" \
@@ -72,6 +79,12 @@ jobs:
             -DCMAKE_C_COMPILER=/ucrt64/bin/gcc.exe \
             -DCMAKE_CXX_COMPILER=/ucrt64/bin/g++.exe \
             -DMINGW=TRUE
+
+          NVCONF=$(find buildNativeCore -name ADM_coreConfig.h -print -quit)
+          test -n "$NVCONF"
+          echo "NV feature config: $NVCONF"
+          grep -n '^#define USE_NVENC' "$NVCONF"
+
           cmake --build buildNativeCore --parallel 16
           cmake --install buildNativeCore
           cmake -S avidemux/qt4 -B buildNativeQt6 -G Ninja \
