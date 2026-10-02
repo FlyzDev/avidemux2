@@ -11,6 +11,59 @@
 #include <algorithm>
 #include <cmath>
 
+namespace
+{
+// Waveform samples are stored as linear full-scale peaks. Drawing those values
+// linearly makes ordinary speech at -20 to -40 dBFS collapse to only a pixel or
+// two, especially in multi-track mode. Use a robust content reference plus a
+// square-root display curve to improve visibility without touching the audio.
+//
+// The 98th percentile prevents a handful of transients from shrinking the
+// entire waveform. The 0.05 floor caps automatic visual gain at 20x, while the
+// -60 dB relative floor keeps real silence / extremely low noise visually flat.
+static const float kDisplayReferencePercentile = 0.98f;
+static const float kMinimumDisplayReference = 0.05f;
+static const float kMinimumVisibleRatio = 0.001f;
+
+void appendDisplaySamples(const std::vector<float> &peaks, std::vector<float> &samples)
+{
+    for (size_t i = 0; i < peaks.size(); ++i)
+    {
+        const float value = std::fabs(peaks[i]);
+        if (std::isfinite(value) && value > 0.0f)
+            samples.push_back(value);
+    }
+}
+
+float displayReferenceFromSamples(std::vector<float> samples)
+{
+    if (samples.empty())
+        return 1.0f;
+
+    const size_t percentileIndex = std::min(
+        samples.size() - 1,
+        static_cast<size_t>(kDisplayReferencePercentile * static_cast<float>(samples.size() - 1)));
+    std::nth_element(samples.begin(), samples.begin() + percentileIndex, samples.end());
+
+    const float percentile = samples[percentileIndex];
+    return std::max(kMinimumDisplayReference, std::min(1.0f, percentile));
+}
+
+float displayAmplitude(float amplitude, float reference)
+{
+    amplitude = std::fabs(amplitude);
+    if (!std::isfinite(amplitude) || amplitude <= 0.0f)
+        return 0.0f;
+
+    reference = std::max(kMinimumDisplayReference, reference);
+    const float ratio = std::min(1.0f, amplitude / reference);
+    if (ratio < kMinimumVisibleRatio)
+        return 0.0f;
+
+    return std::sqrt(ratio);
+}
+}
+
 ADM_mwWaveform::ADM_mwWaveform(QWidget *parent)
     : QWidget(parent),
       totalDuration(0),
@@ -19,7 +72,10 @@ ADM_mwWaveform::ADM_mwWaveform(QWidget *parent)
       markerBTime(0),
       trackCount(0),
       mode(DisplayCombined),
-      generating(false)
+      generating(false),
+      combinedDisplayReference(1.0f),
+      trackDisplayReference(1.0f),
+      channelDisplayReference(1.0f)
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setMinimumHeight(52);
@@ -120,6 +176,9 @@ void ADM_mwWaveform::clearPeaks(void)
     combinedPeaks.clear();
     trackPeaks.clear();
     channelPeaks.clear();
+    combinedDisplayReference = 1.0f;
+    trackDisplayReference = 1.0f;
+    channelDisplayReference = 1.0f;
     updatePreferredHeight();
     update();
 }
@@ -127,6 +186,7 @@ void ADM_mwWaveform::clearPeaks(void)
 void ADM_mwWaveform::setCombinedPeaks(const std::vector<float> &peaks)
 {
     combinedPeaks = peaks;
+    updateDisplayReferences();
     update();
 }
 
@@ -137,6 +197,7 @@ void ADM_mwWaveform::setTrackPeaks(const std::vector<std::vector<float> > &peaks
     if (trackCount != static_cast<int>(trackPeaks.size()))
         trackCount = static_cast<int>(trackPeaks.size());
     rebuildCombinedPeaks();
+    updateDisplayReferences();
     if (mode == DisplayChannels)
         mode = DisplayCombined;
     updatePreferredHeight();
@@ -149,6 +210,7 @@ void ADM_mwWaveform::setChannelPeaks(const std::vector<std::vector<std::vector<f
     trackCount = static_cast<int>(channelPeaks.size());
     rebuildTrackPeaksFromChannels();
     rebuildCombinedPeaks();
+    updateDisplayReferences();
     updatePreferredHeight();
     update();
 }
@@ -237,7 +299,38 @@ void ADM_mwWaveform::updatePreferredHeight(void)
         emit preferredHeightChanged(wanted);
 }
 
-void ADM_mwWaveform::drawPeakVector(QPainter &painter, const QRect &rect, const std::vector<float> &peaks) const
+void ADM_mwWaveform::updateDisplayReferences(void)
+{
+    std::vector<float> samples;
+
+    samples.reserve(combinedPeaks.size());
+    appendDisplaySamples(combinedPeaks, samples);
+    combinedDisplayReference = displayReferenceFromSamples(samples);
+
+    samples.clear();
+    size_t trackSampleCount = 0;
+    for (size_t track = 0; track < trackPeaks.size(); ++track)
+        trackSampleCount += trackPeaks[track].size();
+    samples.reserve(trackSampleCount);
+    for (size_t track = 0; track < trackPeaks.size(); ++track)
+        appendDisplaySamples(trackPeaks[track], samples);
+    trackDisplayReference = displayReferenceFromSamples(samples);
+
+    samples.clear();
+    size_t channelSampleCount = 0;
+    for (size_t track = 0; track < channelPeaks.size(); ++track)
+        for (size_t channel = 0; channel < channelPeaks[track].size(); ++channel)
+            channelSampleCount += channelPeaks[track][channel].size();
+    samples.reserve(channelSampleCount);
+    for (size_t track = 0; track < channelPeaks.size(); ++track)
+        for (size_t channel = 0; channel < channelPeaks[track].size(); ++channel)
+            appendDisplaySamples(channelPeaks[track][channel], samples);
+    channelDisplayReference = displayReferenceFromSamples(samples);
+}
+
+void ADM_mwWaveform::drawPeakVector(QPainter &painter, const QRect &rect,
+                                    const std::vector<float> &peaks,
+                                    float displayReference) const
 {
     if (rect.width() <= 0 || rect.height() <= 0)
         return;
@@ -258,10 +351,30 @@ void ADM_mwWaveform::drawPeakVector(QPainter &painter, const QRect &rect, const 
 
     for (int x = 0; x < rect.width(); ++x)
     {
-        const size_t index = std::min(peakCount - 1,
-                                      static_cast<size_t>((static_cast<double>(x) / std::max(1, rect.width() - 1)) * (peakCount - 1)));
-        const float amplitude = std::min(1.0f, std::fabs(peaks[index]));
-        const int extent = static_cast<int>(amplitude * halfHeight);
+        // A screen pixel often represents multiple peak bins (8192 bins are
+        // cached by default). Preserve the loudest peak inside the complete
+        // pixel interval instead of sampling one bin and potentially skipping
+        // short speech, clicks or other transients.
+        const size_t first = std::min(
+            peakCount - 1,
+            (static_cast<size_t>(x) * peakCount) / static_cast<size_t>(rect.width()));
+        size_t after = ((static_cast<size_t>(x + 1) * peakCount) +
+                        static_cast<size_t>(rect.width()) - 1) /
+                       static_cast<size_t>(rect.width());
+        after = std::min(peakCount, std::max(first + 1, after));
+
+        float peak = 0.0f;
+        for (size_t index = first; index < after; ++index)
+        {
+            const float value = std::fabs(peaks[index]);
+            if (std::isfinite(value))
+                peak = std::max(peak, value);
+        }
+
+        const float visibleAmplitude = displayAmplitude(peak, displayReference);
+        int extent = static_cast<int>(visibleAmplitude * halfHeight + 0.5f);
+        if (visibleAmplitude > 0.0f && extent < 1)
+            extent = 1;
         painter.drawLine(rect.left() + x, center - extent, rect.left() + x, center + extent);
     }
 }
@@ -292,7 +405,7 @@ void ADM_mwWaveform::drawLaneLabel(QPainter &painter, const QRect &rect, const Q
 
 void ADM_mwWaveform::drawEmptyTrack(QPainter &painter, const QRect &rect, const QString &label) const
 {
-    drawPeakVector(painter, rect, std::vector<float>());
+    drawPeakVector(painter, rect, std::vector<float>(), 1.0f);
     drawLaneLabel(painter, rect, label);
 }
 
@@ -382,7 +495,7 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
             const QString label = tr("A%1").arg(i + 1);
             if (i < static_cast<int>(trackPeaks.size()) && !trackPeaks[i].empty())
             {
-                drawPeakVector(painter, row, trackPeaks[i]);
+                drawPeakVector(painter, row, trackPeaks[i], trackDisplayReference);
                 drawLaneLabel(painter, row, label);
             }
             else
@@ -412,7 +525,7 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
                 const std::vector<float> &peaks = channelPeaks[track][channel];
                 if (!peaks.empty())
                 {
-                    drawPeakVector(painter, row, peaks);
+                    drawPeakVector(painter, row, peaks, channelDisplayReference);
                     drawLaneLabel(painter, row, label);
                 }
                 else
@@ -423,7 +536,7 @@ void ADM_mwWaveform::paintEvent(QPaintEvent *event)
     else
     {
         if (!combinedPeaks.empty())
-            drawPeakVector(painter, content, combinedPeaks);
+            drawPeakVector(painter, content, combinedPeaks, combinedDisplayReference);
         else
             drawEmptyTrack(painter, content, generating ? tr("Generating waveform…")
                                                         : tr("Master / combined waveform"));

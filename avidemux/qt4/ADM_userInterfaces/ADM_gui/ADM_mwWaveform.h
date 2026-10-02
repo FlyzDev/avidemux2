@@ -62,11 +62,16 @@ private:
     std::vector<float> combinedPeaks;
     std::vector<std::vector<float> > trackPeaks;
     std::vector<std::vector<std::vector<float> > > channelPeaks;
+    float combinedDisplayReference;
+    float trackDisplayReference;
+    float channelDisplayReference;
 
     int timeToX(uint64_t time) const;
     int channelRows(void) const;
     void updatePreferredHeight(void);
-    void drawPeakVector(QPainter &painter, const QRect &rect, const std::vector<float> &peaks) const;
+    void updateDisplayReferences(void);
+    void drawPeakVector(QPainter &painter, const QRect &rect, const std::vector<float> &peaks,
+                        float displayReference) const;
     void drawLaneLabel(QPainter &painter, const QRect &rect, const QString &label) const;
     void drawEmptyTrack(QPainter &painter, const QRect &rect, const QString &label) const;
     void drawTimelineMarkers(QPainter &painter) const;
