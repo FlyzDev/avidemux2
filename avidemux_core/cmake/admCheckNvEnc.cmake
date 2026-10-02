@@ -8,8 +8,14 @@ MACRO(checkNvEnc)
         IF(NVENC)
             PKG_CHECK_MODULES(FFNVENC ffnvcodec)
             IF(FFNVENC_FOUND)
+                # pkg-config reports the include root (e.g. /ucrt64/include on
+                # MSYS2) while nv-codec-headers installs its public headers in
+                # the ffnvcodec subdirectory. FFNVENC_CFLAGS contains compiler
+                # flags and must not be treated as filesystem paths.
                 FIND_PATH(NVENC_INCLUDE_DIR dynlink_loader.h
-                        PATHS /usr/local/include/ffnvcodec /usr/include/ffnvcodec /include/ffnvcodec ${FFNVENC_CFLAGS} ${CROSS}/include)
+                        HINTS ${FFNVENC_INCLUDE_DIRS} ${FFNVENC_INCLUDEDIR}
+                        PATHS /usr/local/include /usr/include /include ${CROSS}/include
+                        PATH_SUFFIXES ffnvcodec)
                 IF(NVENC_INCLUDE_DIR)
                     MESSAGE(STATUS "NVENC header found in ${NVENC_INCLUDE_DIR}")
                     SET(USE_NVENC True CACHE BOOL "")
