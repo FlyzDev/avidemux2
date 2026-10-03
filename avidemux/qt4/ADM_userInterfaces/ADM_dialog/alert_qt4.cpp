@@ -18,6 +18,9 @@
 #include <QWidget>
 #include <QPushButton>
 #include <QStyle>
+#include <QLabel>
+#include <QGridLayout>
+#include <QDialogButtonBox>
 #include <cstring>
 
 #include "ADM_inttype.h"
@@ -38,24 +41,11 @@ static QString convertAccels(const char *in)
     return out;
 }
 
-static void alertCommon(enum QMessageBox::Icon icon, const char *title, const char *alert, const char *desc,
-                        bool silentSound = false)
+static void alertCommon(enum QMessageBox::Icon icon, const char *title, const char *alert, const char *desc)
 {
     QMessageBox box(qtLastRegisteredDialog());
     box.setWindowTitle(QString::fromUtf8(title));
-    if (silentSound && icon == QMessageBox::Information)
-    {
-        // On Windows, a standard QMessageBox::Information icon triggers the
-        // system notification sound through accessibility. Supplying the same
-        // visual icon as a custom pixmap keeps the popup unchanged without the
-        // completion chime.
-        QIcon infoIcon = box.style()->standardIcon(QStyle::SP_MessageBoxInformation);
-        box.setIconPixmap(infoIcon.pixmap(32, 32));
-    }
-    else
-    {
-        box.setIcon(icon);
-    }
+    box.setIcon(icon);
     box.setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     QString alertString = QString::fromUtf8(alert);
@@ -76,6 +66,36 @@ static void alertCommon(enum QMessageBox::Icon icon, const char *title, const ch
 #endif
     box.exec();
 }
+
+#ifdef _WIN32
+static void showSilentSuccessfulSave(const char *primary, const char *secondary)
+{
+    QDialog dialog(qtLastRegisteredDialog());
+    dialog.setWindowTitle(QString::fromUtf8(QT_TRANSLATE_NOOP("qtalert", "Info")));
+
+    QGridLayout *layout = new QGridLayout(&dialog);
+    QLabel *iconLabel = new QLabel(&dialog);
+    QIcon infoIcon = dialog.style()->standardIcon(QStyle::SP_MessageBoxInformation);
+    iconLabel->setPixmap(infoIcon.pixmap(32, 32));
+    iconLabel->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+
+    QLabel *textLabel = new QLabel(&dialog);
+    QString text = QString::fromUtf8(primary ? primary : "");
+    if (secondary)
+        text = "<b>" + text + "</b><br><br>" + QString::fromUtf8(secondary);
+    textLabel->setText(text);
+    textLabel->setTextFormat(Qt::RichText);
+    textLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+
+    QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok, &dialog);
+    QObject::connect(buttons, SIGNAL(accepted()), &dialog, SLOT(accept()));
+
+    layout->addWidget(iconLabel, 0, 0, Qt::AlignTop);
+    layout->addWidget(textLabel, 0, 1);
+    layout->addWidget(buttons, 1, 0, 1, 2);
+    dialog.exec();
+}
+#endif
 
 static bool questionCommon(const char *title, const char *question, const char *desc,
     const char *confirm, enum QMessageBox::StandardButton alternative)
@@ -137,16 +157,22 @@ void GUI_Info_HIG(const ADM_LOG_LEVEL level,const char *primary, const char *sec
         return;
     }
 
+#ifdef _WIN32
     const bool silentSuccessfulSave = primary && secondary_format &&
         !std::strcmp(primary, "Done") &&
         std::strstr(secondary_format, "has been successfully saved.");
 
     if (silentSuccessfulSave)
-        printf("Successful save notification: suppressing system sound\n");
+    {
+        printf("Successful save notification: using silent dialog\n");
+        showSilentSuccessfulSave(primary, secondary_format);
+        return;
+    }
+#endif
 
     alertCommon(QMessageBox::Information,
         QT_TRANSLATE_NOOP("qtalert","Info"),
-        primary, secondary_format, silentSuccessfulSave);
+        primary, secondary_format);
 }
 /**
     \fn GUI_Error_HIG
