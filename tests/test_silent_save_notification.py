@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 from pathlib import Path
 
-src = Path('avidemux/qt4/ADM_userInterfaces/ADM_dialog/alert_qt4.cpp').read_text(encoding='utf-8')
+save_src = Path('avidemux/common/gui_save.cpp').read_text(encoding='utf-8')
+start = save_src.index('int A_SaveWrapper(const char *name)')
+end = save_src.index('\n}', start) + 2
+wrapper = save_src[start:end]
 
-assert 'silentSuccessfulSave' in src, 'successful-save detection is missing'
-assert 'showSilentSuccessfulSave(primary, secondary_format);' in src, (
-    'successful save must use the dedicated non-QMessageBox dialog path'
+assert 'UI_notifyInfo(' in wrapper, (
+    'successful save must use the non-modal status-bar notification path'
 )
-assert 'alertCommon(QMessageBox::Information,\n        QT_TRANSLATE_NOOP("qtalert","Info"),\n        primary, secondary_format, silentSuccessfulSave);' not in src, (
-    'successful save is still routed through QMessageBox and can trigger the Windows alert sound'
+assert 'GUI_Info_HIG(' not in wrapper, (
+    'successful save still creates a modal dialog, which can trigger the Windows notification sound'
 )
 print('silent save notification source regression: PASS')

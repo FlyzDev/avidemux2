@@ -669,8 +669,10 @@ int A_SaveWrapper(const char *name)
 
     if (A_Save(name))
     {
-        GUI_Info_HIG(ADM_LOG_INFO, QT_TRANSLATE_NOOP("adm", "Done"),
-                     QT_TRANSLATE_NOOP("adm", "File %s has been successfully saved."), ADM_getFileName(name).c_str());
+        char message[1024];
+        snprintf(message, sizeof(message), QT_TRANSLATE_NOOP("adm", "File %s has been successfully saved."),
+                 ADM_getFileName(name).c_str());
+        UI_notifyInfo(message, 4000);
     }
     else
     {
