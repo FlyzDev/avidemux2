@@ -462,7 +462,7 @@ void MainWindow::sliderReleased(void)
     SliderIsShifted = 0;
     dragTimer.stop();
     dragState = dragState_Normal;
-    if (!dragWhilePlay && ctrlKeyHeld)
+    if (!dragWhilePlay)
         sendAction(ACT_FineScale);
     else
         sendAction(ACT_Scale);
