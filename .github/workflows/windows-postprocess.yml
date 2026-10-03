@@ -62,6 +62,11 @@ jobs:
           python -m pip install --disable-pip-version-check pefile
           $ucrtBin = Join-Path $env:RUNNER_TEMP "msys64\ucrt64\bin"
           python mxe_scan_deps.py runtime --sources $ucrtBin
+
+          $guiExe = Get-ChildItem runtime -Filter "avidemux.exe" -Recurse | Where-Object { $_.Name -notmatch "cli" } | Select-Object -First 1
+          if (-not $guiExe) { throw "Avidemux GUI executable is missing before portable rename." }
+          $portableExe = Join-Path $guiExe.DirectoryName "avidemux_portable.exe"
+          Move-Item -Path $guiExe.FullName -Destination $portableExe -Force
       - name: Smoke launch with multi-track fixture
         shell: pwsh
         run: |
@@ -69,6 +74,9 @@ jobs:
           if (-not $exe) { throw "Avidemux GUI executable is missing." }
           $fixture = Get-ChildItem incoming -Filter "windows-waveform-multitrack-test.mkv" -Recurse | Select-Object -First 1
           if (-not $fixture) { throw "Multi-track fixture is missing." }
+          if ($exe.Name -ne "avidemux_portable.exe") { throw "Portable GUI executable was not selected." }
+          $settingsDir = Join-Path $exe.DirectoryName "settings"
+          Remove-Item $settingsDir -Recurse -Force -ErrorAction SilentlyContinue
           $stdout = Join-Path $env:RUNNER_TEMP "avidemux-waveform-stdout.txt"
           $stderr = Join-Path $env:RUNNER_TEMP "avidemux-waveform-stderr.txt"
           $args = '"' + $fixture.FullName + '"'
@@ -80,6 +88,8 @@ jobs:
             throw "Avidemux exited early with code $($proc.ExitCode)."
           }
           if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          if (-not (Test-Path $settingsDir)) { throw "Portable mode did not create its local settings directory." }
+          Write-Host "Portable mode verified via local settings directory: $settingsDir"
           Get-Content $stdout -ErrorAction SilentlyContinue
           Get-Content $stderr -ErrorAction SilentlyContinue
       - name: Package portable Windows build
