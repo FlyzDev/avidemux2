@@ -17,6 +17,8 @@
 #include <QMessageBox>
 #include <QWidget>
 #include <QPushButton>
+#include <QStyle>
+#include <cstring>
 
 #include "ADM_inttype.h"
 #include "DIA_coreToolkit.h"
@@ -36,11 +38,24 @@ static QString convertAccels(const char *in)
     return out;
 }
 
-static void alertCommon(enum QMessageBox::Icon icon, const char *title, const char *alert, const char *desc)
+static void alertCommon(enum QMessageBox::Icon icon, const char *title, const char *alert, const char *desc,
+                        bool silentSound = false)
 {
     QMessageBox box(qtLastRegisteredDialog());
     box.setWindowTitle(QString::fromUtf8(title));
-    box.setIcon(icon);
+    if (silentSound && icon == QMessageBox::Information)
+    {
+        // On Windows, a standard QMessageBox::Information icon triggers the
+        // system notification sound through accessibility. Supplying the same
+        // visual icon as a custom pixmap keeps the popup unchanged without the
+        // completion chime.
+        QIcon infoIcon = box.style()->standardIcon(QStyle::SP_MessageBoxInformation);
+        box.setIconPixmap(infoIcon.pixmap(32, 32));
+    }
+    else
+    {
+        box.setIcon(icon);
+    }
     box.setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     QString alertString = QString::fromUtf8(alert);
@@ -122,9 +137,16 @@ void GUI_Info_HIG(const ADM_LOG_LEVEL level,const char *primary, const char *sec
         return;
     }
 
+    const bool silentSuccessfulSave = primary && secondary_format &&
+        !std::strcmp(primary, "Done") &&
+        std::strstr(secondary_format, "has been successfully saved.");
+
+    if (silentSuccessfulSave)
+        printf("Successful save notification: suppressing system sound\n");
+
     alertCommon(QMessageBox::Information,
         QT_TRANSLATE_NOOP("qtalert","Info"),
-        primary, secondary_format);
+        primary, secondary_format, silentSuccessfulSave);
 }
 /**
     \fn GUI_Error_HIG
