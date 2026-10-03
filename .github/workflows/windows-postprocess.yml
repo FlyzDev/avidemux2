@@ -70,8 +70,8 @@ jobs:
       - name: Smoke launch with multi-track fixture
         shell: pwsh
         run: |
-          $exe = Get-ChildItem runtime -Filter "avidemux*.exe" -Recurse | Where-Object { $_.Name -notmatch "cli" } | Select-Object -First 1
-          if (-not $exe) { throw "Avidemux GUI executable is missing." }
+          $exe = Get-ChildItem runtime -Filter "avidemux_portable.exe" -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Avidemux portable GUI executable is missing." }
           $fixture = Get-ChildItem incoming -Filter "windows-waveform-multitrack-test.mkv" -Recurse | Select-Object -First 1
           if (-not $fixture) { throw "Multi-track fixture is missing." }
           if ($exe.Name -ne "avidemux_portable.exe") { throw "Portable GUI executable was not selected." }
