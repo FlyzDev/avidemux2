@@ -65,12 +65,14 @@ QRect UI_getAvailableScreenGeometry(QWidget *window)
     QScreen *screen = NULL;
     if (window)
     {
-        // Use the monitor containing the actual window. Basing resize and
-        // zoom-to-fit on the primary monitor makes playback pull windows
-        // back to the primary display in multi-monitor setups.
-        screen = QGuiApplication::screenAt(window->frameGeometry().center());
-        if (!screen && window->windowHandle())
+        // QWindow tracks the monitor association in Qt's own coordinate
+        // system and remains reliable with mixed-DPI Windows displays.
+        // screenAt(frameGeometry().center()) can misidentify the monitor
+        // when native and Qt logical coordinates use different scales.
+        if (window->windowHandle())
             screen = window->windowHandle()->screen();
+        if (!screen)
+            screen = QGuiApplication::screenAt(window->frameGeometry().center());
     }
     if (!screen)
         screen = QGuiApplication::primaryScreen();

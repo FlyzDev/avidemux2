@@ -7,6 +7,9 @@ header = Path('avidemux/qt4/ADM_UIs/include/ADM_toolkitQt.h').read_text(encoding
 
 assert 'UI_getAvailableScreenGeometry' in header, 'shared current-screen geometry helper is missing'
 assert 'QGuiApplication::screenAt' in toolkit or 'windowHandle()->screen()' in toolkit, 'screen helper does not use the window current screen'
+handle_screen = toolkit.index('window->windowHandle()->screen()')
+screen_at = toolkit.index('QGuiApplication::screenAt')
+assert handle_screen < screen_at, 'window-handle screen must be authoritative before coordinate-based screenAt fallback'
 start = gui.index('void UI_resize(uint32_t w, uint32_t h)')
 end = gui.index('void UI_getMaximumPreviewSize', start)
 resize = gui[start:end]
