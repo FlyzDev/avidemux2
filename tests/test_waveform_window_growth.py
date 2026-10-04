@@ -5,6 +5,7 @@ anchor = src.index('// Waveform overview.')
 block = src[anchor:anchor + 3200]
 
 assert 'previousWaveformHeight' in block, 'waveform resize handler must track the previous preferred height'
+assert 'const auto resizeNavigationForWaveform' not in block, 'mutable waveform resize lambda must not be const'
 assert 'const int delta = waveformHeight - previousWaveformHeight' in block, 'main-window growth must be based on the waveform height delta'
 assert 'isMaximized()' in block and 'isFullScreen()' in block, 'maximized/fullscreen windows must not be force-resized'
 assert 'UI_getAvailableScreenGeometry(this)' in block, 'waveform growth must use the current monitor work area'

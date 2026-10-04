@@ -891,7 +891,7 @@ MainWindow::MainWindow(const vector<IScriptEngine *> &scriptEngines) : _scriptEn
     ui.verticalLayout_8->insertWidget(1, waveform);
     int previousWaveformHeight = waveform->minimumHeight();
     int waveformWindowCompensation = 0;
-    const auto resizeNavigationForWaveform = [this, navigationBaseHeight, previousWaveformHeight, waveformWindowCompensation](int waveformHeight) mutable {
+    auto resizeNavigationForWaveform = [this, navigationBaseHeight, previousWaveformHeight, waveformWindowCompensation](int waveformHeight) mutable {
         const int wanted = navigationBaseHeight + waveformHeight;
         ui.navigationWidget->setMinimumHeight(wanted);
         ui.navigationWidget->setMaximumHeight(wanted);
