@@ -889,10 +889,36 @@ MainWindow::MainWindow(const vector<IScriptEngine *> &scriptEngines) : _scriptEn
     const int navigationBaseHeight = ui.navigationWidget->minimumHeight();
     waveform = new ADM_mwWaveform(ui.dockWidgetContents_2);
     ui.verticalLayout_8->insertWidget(1, waveform);
-    const auto resizeNavigationForWaveform = [this, navigationBaseHeight](int waveformHeight) {
+    int previousWaveformHeight = waveform->minimumHeight();
+    int waveformWindowCompensation = 0;
+    const auto resizeNavigationForWaveform = [this, navigationBaseHeight, previousWaveformHeight, waveformWindowCompensation](int waveformHeight) mutable {
         const int wanted = navigationBaseHeight + waveformHeight;
         ui.navigationWidget->setMinimumHeight(wanted);
         ui.navigationWidget->setMaximumHeight(wanted);
+
+        const int delta = waveformHeight - previousWaveformHeight;
+        previousWaveformHeight = waveformHeight;
+        if (!delta || isMaximized() || isFullScreen())
+            return;
+
+        int appliedDelta = delta;
+        if (delta > 0)
+        {
+            const QRect space = UI_getAvailableScreenGeometry(this);
+            const int availableBelow = std::max(0, space.bottom() - frameGeometry().bottom());
+            appliedDelta = std::min(delta, availableBelow);
+        }
+        else
+        {
+            appliedDelta = std::max(delta, -waveformWindowCompensation);
+        }
+        if (!appliedDelta)
+            return;
+
+        setBlockZoomChangesFlag(true);
+        resize(width(), height() + appliedDelta);
+        setBlockZoomChangesFlag(false);
+        waveformWindowCompensation += appliedDelta;
     };
     resizeNavigationForWaveform(waveform->minimumHeight());
     connect(waveform, &ADM_mwWaveform::preferredHeightChanged, this, resizeNavigationForWaveform);
