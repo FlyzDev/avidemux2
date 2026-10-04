@@ -32,6 +32,7 @@ extern VideoRenderBase *spawnSdlRender();
 
 #if defined(USE_OPENGL)
 extern VideoRenderBase *RenderSpawnQtGl(void);
+extern bool ADM_glHasActiveTexture(void);
 #endif
 /**                                                                                                                    \
  *                                                                                                                     \
@@ -79,6 +80,10 @@ VideoRenderBase *spawnCommonRenderer(ADM_RENDER_TYPE preferred, ADM_renderContex
         if (!hasOpenGl)
         {
             ADM_warning("OpenGl is disabled\n");
+        }
+        else if (!ADM_glHasActiveTexture())
+        {
+            ADM_warning("OpenGL renderer unavailable: glActiveTexture was not resolved, falling back\n");
         }
         else
         {
