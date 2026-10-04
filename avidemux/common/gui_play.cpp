@@ -136,6 +136,7 @@ void GUI_PlayAvi(bool quit)
 #endif
 
     stop_req = 0;
+    UI_setBlockResizingFlag(true);
     playing = 1;
 
     admPreview::deferDisplay(true);
@@ -153,7 +154,10 @@ void GUI_PlayAvi(bool quit)
 
     // Don't touch display on application exit
     if (exiting)
+    {
+        UI_setBlockResizingFlag(false);
         return;
+    }
 
     admPreview::deferDisplay(false);
     // Resize the output window to original size...
@@ -177,6 +181,7 @@ void GUI_PlayAvi(bool quit)
     UI_purge();
     GUI_setCurrentFrameAndTime();
     UI_purge();
+    UI_setBlockResizingFlag(false);
 }
 /**
     \fn cleanupAudio

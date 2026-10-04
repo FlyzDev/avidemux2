@@ -193,6 +193,12 @@ bool UI_setDisplayName(char const*)
 }
 void UI_setNeedsResizingFlag(bool resize)
 {}
+bool UI_getBlockResizingFlag(void)
+{
+    return false;
+}
+void UI_setBlockResizingFlag(bool block)
+{}
 void UI_setBlockZoomChangesFlag(bool block)
 {}
 void UI_resetZoomThreshold(void)

@@ -56,6 +56,8 @@ void UI_getWindowInfo(void *draw, GUI_WindowInfo *xinfo);
 void UI_resize(uint32_t width, uint32_t height);
 bool UI_getNeedsResizingFlag(void);
 void UI_setNeedsResizingFlag(bool resize);
+bool UI_getBlockResizingFlag(void);
+void UI_setBlockResizingFlag(bool block);
 void UI_setBlockZoomChangesFlag(bool block);
 void UI_resetZoomThreshold(void);
 void UI_setZoomToFitIntoWindow(void);

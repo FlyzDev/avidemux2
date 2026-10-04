@@ -4044,6 +4044,22 @@ void UI_setNeedsResizingFlag(bool resize)
 }
 
 /**
+    \fn UI_getBlockResizingFlag
+*/
+bool UI_getBlockResizingFlag(void)
+{
+    return ((MainWindow *)QuiMainWindows)->getBlockResizingFlag();
+}
+
+/**
+    \fn UI_setBlockResizingFlag
+*/
+void UI_setBlockResizingFlag(bool block)
+{
+    ((MainWindow *)QuiMainWindows)->setBlockResizingFlag(block);
+}
+
+/**
     \fn UI_setBlockZoomChangesFlag
 */
 void UI_setBlockZoomChangesFlag(bool block)
