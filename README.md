@@ -42,9 +42,9 @@ Intel macOS and Linux binaries are not published yet. The source remains cross-p
 
 ### Windows
 
-Download the Windows x64 portable zip from the latest release, extract it to a normal folder, then run `avidemux.exe`.
+Download the Windows x64 portable zip from the latest release, extract it to a normal folder, then run `avidemux_portable.exe`.
 
-No installer is required. Keep the DLLs and plugin folders next to the executable.
+No installer is required. Keep the DLLs and plugin folders next to the executable. The portable executable keeps settings in the local `settings` folder beside the app.
 
 ### macOS Apple Silicon
 
@@ -73,6 +73,10 @@ Use the **M+** button beside the navigation controls to import timeline markers.
 - JSON as either an array of marker objects or `{ "fps": 60, "markers": [...] }`. Marker time can be supplied as `timeUs`, `timeMs`, `seconds`, `frame`, `in`, `time`, or `timecode`.
 
 Imported markers are session-local and do not replace Avidemux's A/B selection markers. They appear as marker lines on the seek bar and waveform. Use **M◀ / M▶** or **Alt+Left / Alt+Right** to jump to the previous or next imported marker.
+
+## Patch notes
+
+See [`PATCH_NOTES.md`](PATCH_NOTES.md) for the changes in the current community patch release.
 
 ## Status
 
