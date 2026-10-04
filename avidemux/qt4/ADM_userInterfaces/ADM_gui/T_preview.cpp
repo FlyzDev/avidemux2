@@ -53,6 +53,7 @@ extern "C" Display *XOpenDisplay(const char *display_name);
 #include "GUI_render.h"
 #include "GUI_accelRender.h"
 #include "GUI_ui.h"
+#include "avi_vars.h"
 #include "T_preview.h"
 // clang-format on
 
@@ -61,6 +62,7 @@ extern QApplication *currentQApplication();
 extern QWidget *QuiMainWindows;
 static uint32_t displayW = 0, displayH = 0;
 static ADM_Qvideo *videoWindow = NULL;
+static bool preserveMainWindowGeometryDuringPlayback = false;
 
 void DIA_previewInit(uint32_t width, uint32_t height)
 {
@@ -253,17 +255,27 @@ void UI_updateDrawWindowSize(void *win, uint32_t w, uint32_t h)
     displayW = w;
     displayH = h;
 
+    // Starting and stopping playback changes renderer dimensions. This must not
+    // resize the top-level window the user has positioned and sized manually.
+    // Keep the guard set through the stop / pause restore callback, which runs
+    // after the global playing flag has already been cleared.
+    if (playing)
+        preserveMainWindowGeometryDuringPlayback = true;
+
     // Resizing a maximized window results in not refreshed areas where widgets
     // in the maximized state were drawn with Qt5 on Linux, try to avoid this.
     // Instead, resize the window later on restore event if necessary.
     if (!QuiMainWindows->isMaximized())
     {
-        UI_setBlockZoomChangesFlag(true);
-        UI_resize(w, h);
-        UI_setBlockZoomChangesFlag(false);
-        UI_setNeedsResizingFlag(false);
+        if (!preserveMainWindowGeometryDuringPlayback)
+        {
+            UI_setBlockZoomChangesFlag(true);
+            UI_resize(w, h);
+            UI_setBlockZoomChangesFlag(false);
+            UI_setNeedsResizingFlag(false);
+        }
     }
-    else
+    else if (!preserveMainWindowGeometryDuringPlayback)
     {
         UI_setNeedsResizingFlag(true);
     }
@@ -279,6 +291,11 @@ void UI_updateDrawWindowSize(void *win, uint32_t w, uint32_t h)
         //ADM_info("Restoring main window size from %d x %d to %d x %d\n", QuiMainWindows->width(), QuiMainWindows->height(), restore.width(), restore.height());
         QuiMainWindows->resize(restore);
     }
+
+    // GUI_PlayAvi clears playing before restoring the pre-playback preview.
+    // Clear the guard only after that restore has gone through this function.
+    if (!playing)
+        preserveMainWindowGeometryDuringPlayback = false;
 }
 /**
  *
