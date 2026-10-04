@@ -4,6 +4,8 @@
 #   include <QDesktopWidget>
 #else
 #   include <QScreen>
+#   include <QGuiApplication>
+#   include <QWindow>
 #endif
 
 #include "ADM_toolkitQt.h"
@@ -55,13 +57,30 @@ QWidget* qtLastRegisteredDialog()
 		return NULL;
 }
 
-uint8_t UI_getPhysicalScreenSize(void* window, uint32_t *w,uint32_t *h)
+QRect UI_getAvailableScreenGeometry(QWidget *window)
 {
 #if QT_VERSION < QT_VERSION_CHECK(5,11,0)
-	QRect qrect = QApplication::desktop()->availableGeometry();
+    return QApplication::desktop()->availableGeometry(window);
 #else
-    QRect qrect = QApplication::primaryScreen()->availableGeometry();
+    QScreen *screen = NULL;
+    if (window)
+    {
+        // Use the monitor containing the actual window. Basing resize and
+        // zoom-to-fit on the primary monitor makes playback pull windows
+        // back to the primary display in multi-monitor setups.
+        screen = QGuiApplication::screenAt(window->frameGeometry().center());
+        if (!screen && window->windowHandle())
+            screen = window->windowHandle()->screen();
+    }
+    if (!screen)
+        screen = QGuiApplication::primaryScreen();
+    return screen ? screen->availableGeometry() : QRect();
 #endif
+}
+
+uint8_t UI_getPhysicalScreenSize(void* window, uint32_t *w,uint32_t *h)
+{
+    QRect qrect = UI_getAvailableScreenGeometry(static_cast<QWidget *>(window));
 	*w = (uint32_t)qrect.width();
 	*h = (uint32_t)qrect.height();
     return 1;

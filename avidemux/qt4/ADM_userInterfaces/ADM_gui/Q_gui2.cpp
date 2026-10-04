@@ -3935,11 +3935,7 @@ void UI_resize(uint32_t w, uint32_t h)
     reqw += w;
     reqh += h;
     uint32_t screenW = 0, screenH = 0;
-#if QT_VERSION < QT_VERSION_CHECK(5, 11, 0)
-    QRect space = QApplication::desktop()->availableGeometry();
-#else
-    QRect space = QGuiApplication::primaryScreen()->availableGeometry();
-#endif
+    QRect space = UI_getAvailableScreenGeometry(QuiMainWindows);
 
     if (reqw > (uint32_t)space.width())
         reqw = space.width();
