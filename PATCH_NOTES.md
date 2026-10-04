@@ -27,7 +27,7 @@ This patch release focuses on Windows/macOS usability, display stability and pac
 ### macOS Apple Silicon
 
 - macOS ARM64 release builds continue to target macOS 14+.
-- Packaging cleans up stale mounted test DMGs before rebuilding, preventing old read-only mounts from interfering with CPack.
+- Packaging cleans up stale mounted test DMGs before rebuilding and uses a unique internal DMG volume name per CI run, avoiding macOS App Management / LaunchServices reuse failures after smoke-launching a prior build.
 - Release validation includes strict bundle signing checks, DMG verification, ARM64/minimum-OS checks and a LaunchServices smoke launch with multi-track media.
 
 ### Validation

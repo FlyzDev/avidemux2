@@ -63,9 +63,13 @@ jobs:
           cd "$VOLUME/src"
           export PATH="/opt/homebrew/bin:$PATH"
           export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:/opt/homebrew/share/pkgconfig"
+          # macOS can remember an app launched from a previous DMG and then deny
+          # hdiutil access when the same volume name is reused. Keep the release
+          # filenames stable later, but make CPack's internal volume unique per run.
+          PACKAGE_NAME="Avidemux-Waveform-macOS-Apple-Silicon-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           bash bootStrapMacOS_Monterey.arm64.sh \
             --with-internal-libmp4v2 \
-            --output=Avidemux-Waveform-macOS-Apple-Silicon
+            --output="$PACKAGE_NAME"
 
           APP=$(find installer -maxdepth 1 -type d -name 'Avidemux-*.app' -print -quit)
           DMG=$(find installer -maxdepth 1 -type f -name '*.dmg' -print -quit)
