@@ -156,9 +156,8 @@ jobs:
             avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_qtWaveformController.cpp
 
   windows-package:
-    needs: linux-start
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[winbuild]')
-    runs-on: [self-hosted, Linux, X64, rtx2080-linux, avidemux2]
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
@@ -230,7 +229,7 @@ jobs:
             windows-waveform-multitrack-test.mkv
 
   cleanup-worker:
-    needs: [wake-worker, mingw-smoke, native-msys2-smoke, windows-package]
+    needs: [wake-worker, mingw-smoke, native-msys2-smoke]
     if: ${{ always() && needs.wake-worker.result == 'success' && needs.wake-worker.outputs.woke == 'true' }}
     runs-on: [self-hosted, macOS, ARM64, waveform]
     timeout-minutes: 5
