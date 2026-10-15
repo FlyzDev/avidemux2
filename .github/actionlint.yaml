@@ -1,0 +1,8 @@
+self-hosted-runner:
+  labels:
+    - mac-mini
+    - avidemux
+    - waveform
+    - rtx2080
+    - rtx2080-linux
+    - avidemux2

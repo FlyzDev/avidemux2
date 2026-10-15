@@ -12,9 +12,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  wake-worker:
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'feat/waveform-ui' || contains(github.event.head_commit.message, '[nativewin]') || contains(github.event.head_commit.message, '[winsmoke]') || contains(github.event.head_commit.message, '[winbuild]')
+    runs-on: [self-hosted, macOS, ARM64, waveform]
+    timeout-minutes: 5
+    outputs:
+      woke: ${{ steps.wake.outputs.woke }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wake RTX 2080 host
+        id: wake
+        run: tools/ci/rtx2080-worker.sh wake
+
+  linux-start:
+    needs: wake-worker
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'feat/waveform-ui' || contains(github.event.head_commit.message, '[nativewin]') || contains(github.event.head_commit.message, '[winsmoke]') || contains(github.event.head_commit.message, '[winbuild]')
+    runs-on: [self-hosted, macOS, ARM64, waveform]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start Ubuntu VM and verify Docker/Linux runner
+        run: tools/ci/rtx2080-worker.sh linux-start
+
   mingw-smoke:
+    needs: linux-start
     if: github.event_name == 'workflow_dispatch' || github.ref_name == 'feat/waveform-ui' || contains(github.event.head_commit.message, '[nativewin]') || contains(github.event.head_commit.message, '[winsmoke]')
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, rtx2080-linux, avidemux2]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -52,8 +75,9 @@ jobs:
           grep -q 'ADM_waveformIndexer.cpp' avidemux/common/ADM_editor/src/CMakeLists.txt
           test -f avidemux/qt4/i18n/CMakeLists.txt
   native-msys2-smoke:
+    needs: wake-worker
     if: github.event_name == 'workflow_dispatch' || github.ref_name == 'feat/waveform-ui' || contains(github.event.head_commit.message, '[nativewin]') || contains(github.event.head_commit.message, '[winsmoke]')
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64, rtx2080, avidemux2]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -132,8 +156,9 @@ jobs:
             avidemux/qt4/ADM_userInterfaces/ADM_gui/ADM_qtWaveformController.cpp
 
   windows-package:
+    needs: linux-start
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[winbuild]')
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, rtx2080-linux, avidemux2]
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
@@ -203,3 +228,13 @@ jobs:
           path: |
             avidemux-waveform-win64-qt6.zip
             windows-waveform-multitrack-test.mkv
+
+  cleanup-worker:
+    needs: [wake-worker, mingw-smoke, native-msys2-smoke, windows-package]
+    if: ${{ always() && needs.wake-worker.result == 'success' && needs.wake-worker.outputs.woke == 'true' }}
+    runs-on: [self-hosted, macOS, ARM64, waveform]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Power off RTX 2080 host when all shared runners are idle
+        run: tools/ci/rtx2080-worker.sh poweroff-if-idle
